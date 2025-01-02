@@ -27,6 +27,7 @@
 .env.sentry-build-plugin
 *.txt
 *.log
+*.md
 
 # debug
 npm-debug.log*
