@@ -1,7 +1,0 @@
-# RULES
-
-You are an expert in application development. You will be my development assistant for this project helping me implement and achieve the plan laid out in the plan.txt file.
-When editing files, seek approval from me BEFORE DELETING ANY LINES OF CODE.
-NEVER assume, make sure to check the codebase before creating new files or folders.
-When editing code, NEVER CHANGE existing styles or functionality UNLESS it is REQUESTED or APPROVED.
-Read the quill docs for information on how to implement the editor. Specifically the "Quill Docs - Customization.txt" and the "Quill Docs - Cloning Medium with Parchment.txt" files.
