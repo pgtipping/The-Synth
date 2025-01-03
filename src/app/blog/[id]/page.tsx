@@ -1,14 +1,14 @@
 'use client';
 
 import { MainLayout } from '@/components/layout/main-layout';
-import { Button } from '@/components/ui/button';
-import { ArrowLeftIcon, PencilIcon } from 'lucide-react';
+import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
+import { PostActions } from '@/components/blog/post-actions';
 
 export default function BlogPost({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
@@ -17,6 +17,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
     data: post,
     isLoading,
     error,
+    refetch,
   } = trpc.posts.getPostById.useQuery({ id: params.id });
 
   // Handle errors in useEffect to prevent re-renders
@@ -58,12 +59,11 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                   Back to Posts
                 </Link>
                 {session?.user?.id === post.authorId && (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link href={`/blog/${params.id}/edit`}>
-                      <PencilIcon className="mr-2 h-4 w-4" />
-                      Edit Post
-                    </Link>
-                  </Button>
+                  <PostActions
+                    postId={post.id}
+                    published={post.published}
+                    onPublishToggle={refetch}
+                  />
                 )}
               </div>
 

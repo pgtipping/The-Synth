@@ -323,4 +323,48 @@ export const postsRouter = createTRPCRouter({
         nextCursor,
       };
     }),
+
+  togglePublish: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        published: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const post = await ctx.db.post.findUnique({
+        where: { id: input.id },
+        select: { authorId: true },
+      });
+
+      if (!post) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Post not found',
+        });
+      }
+
+      if (post.authorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Not authorized to modify this post',
+        });
+      }
+
+      const updatedPost = await ctx.db.post.update({
+        where: { id: input.id },
+        data: {
+          published: input.published,
+          updatedAt: new Date(),
+        },
+      });
+
+      return {
+        status: 200,
+        message: input.published
+          ? 'Post published successfully'
+          : 'Post unpublished successfully',
+        data: updatedPost,
+      };
+    }),
 });

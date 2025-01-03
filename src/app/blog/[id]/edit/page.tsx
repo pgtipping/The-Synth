@@ -23,6 +23,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
   const { toast } = useToast();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const {
     data: post,
@@ -30,12 +31,14 @@ export default function EditPost({ params }: { params: { id: string } }) {
     error,
   } = trpc.posts.getPostById.useQuery({ id: params.id });
 
+  // Initialize form data once when post is loaded
   useEffect(() => {
-    if (post) {
+    if (post && !isInitialized) {
       setTitle(post.title);
       setContent(post.content);
+      setIsInitialized(true);
     }
-  }, [post]);
+  }, [post, isInitialized]);
 
   const updateDraft = trpc.posts.updateDraft.useMutation({
     onSuccess: () => {
@@ -133,9 +136,9 @@ export default function EditPost({ params }: { params: { id: string } }) {
     <MainLayout>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-8 flex items-center justify-between">
-          <Link href="/blog/drafts" className="nav-button">
+          <Link href={`/blog/${params.id}`} className="nav-button">
             <ArrowLeftIcon className="icon-sm mr-2" />
-            Back to Drafts
+            Back to Post
           </Link>
           <div className="flex items-center gap-2">
             <Button
