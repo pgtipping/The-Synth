@@ -28,6 +28,7 @@
 *.txt
 *.log
 *.md
+.md
 
 # debug
 npm-debug.log*

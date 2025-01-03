@@ -1,5 +1,5 @@
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import { DefaultSession } from 'next-auth';
+import { DefaultSession, SessionStrategy } from 'next-auth';
 import { type JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
@@ -10,7 +10,6 @@ declare module 'next-auth' {
   interface Session extends DefaultSession {
     user: {
       id: string;
-
       emailVerified: Date | null;
       email: string;
     };
@@ -68,7 +67,7 @@ export const authOptions = {
     },
   },
   session: {
-    strategy: 'jwt',
+    strategy: 'jwt' as SessionStrategy,
   },
   pages: {
     signIn: '/login',

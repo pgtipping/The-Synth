@@ -3,8 +3,9 @@ import superjson from 'superjson';
 import { ZodError } from 'zod';
 import { db } from '@/lib/db';
 import type { Session } from 'next-auth';
-import getServerSession from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { headers } from 'next/headers';
 
 interface CreateContextOptions {
   session: Session | null;
@@ -21,7 +22,7 @@ export const createTRPCContext = async (opts: {
   req?: Request;
   res?: Response;
 }) => {
-  const session = (await getServerSession(authOptions)) as Session | null;
+  const session = await getServerSession(authOptions);
 
   return createInnerTRPCContext({
     session,

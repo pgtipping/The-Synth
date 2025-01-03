@@ -1,11 +1,42 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
+import { format } from 'date-fns';
+import { stripHtml } from '@/lib/utils';
 
-// Mock data - replace with actual API call
-const blogs = [
+interface MockPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  author: string;
+  date: string;
+  image: string;
+  category: string;
+  isReal: false;
+}
+
+interface RealPost {
+  id: string;
+  title: string;
+  excerpt: string;
+  author: string;
+  date: string;
+  isReal: true;
+}
+
+type Post = MockPost | RealPost;
+
+function isMockPost(post: Post): post is MockPost {
+  return !post.isReal;
+}
+
+// Mock data - will be removed later
+const mockBlogs = [
   {
     id: '1',
     title: 'Explore the World: Travel Adventures Await You!',
@@ -39,6 +70,31 @@ const blogs = [
 ];
 
 export default function Home() {
+  const {
+    data: postsData,
+    isLoading,
+    error,
+  } = trpc.posts.getPublishedPosts.useQuery({
+    orderBy: 'createdAt',
+    orderDir: 'desc',
+  });
+
+  // Combine mock and real posts
+  const allPosts: Post[] = [
+    ...(postsData?.items || []).map((post) => ({
+      id: post.id,
+      title: post.title,
+      excerpt: stripHtml(post.content).substring(0, 150) + '...',
+      author: post.author?.name || 'Anonymous',
+      date: format(new Date(post.createdAt), 'MMM d, yyyy'),
+      isReal: true as const,
+    })),
+    ...mockBlogs.map((blog) => ({
+      ...blog,
+      isReal: false as const,
+    })),
+  ];
+
   return (
     <MainLayout>
       <section className="relative bg-white py-24">
@@ -102,40 +158,66 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {blogs.map((blog) => (
-            <Link
-              key={blog.id}
-              href={`/blog/${blog.id}`}
-              className="group block overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md"
-            >
-              <div className="relative h-48 w-full overflow-hidden">
-                <Image
-                  src={blog.image}
-                  alt={blog.title}
-                  width={400}
-                  height={225}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="p-4">
-                <div className="mb-2 text-sm font-medium text-muted-foreground">
-                  {blog.category}
-                </div>
-                <h2 className="mb-2 text-lg font-semibold group-hover:text-primary">
-                  {blog.title}
-                </h2>
-                <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
-                  {blog.excerpt}
-                </p>
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>By {blog.author}</span>
-                  <span>{blog.date}</span>
+        {isLoading ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <div
+                key={i}
+                className="animate-pulse overflow-hidden rounded-lg border bg-card"
+              >
+                <div className="h-48 bg-muted" />
+                <div className="space-y-3 p-4">
+                  <div className="h-4 w-1/4 rounded bg-muted" />
+                  <div className="h-6 w-3/4 rounded bg-muted" />
+                  <div className="h-4 w-full rounded bg-muted" />
+                  <div className="flex justify-between">
+                    <div className="h-4 w-1/3 rounded bg-muted" />
+                    <div className="h-4 w-1/4 rounded bg-muted" />
+                  </div>
                 </div>
               </div>
-            </Link>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {allPosts.map((post) => (
+              <Link
+                key={post.id}
+                href={`/blog/${post.id}`}
+                className="group block overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md"
+              >
+                {isMockPost(post) && (
+                  <div className="relative h-48 w-full overflow-hidden">
+                    <Image
+                      src={post.image}
+                      alt={post.title}
+                      width={400}
+                      height={225}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="p-4">
+                  {isMockPost(post) && (
+                    <div className="mb-2 text-sm font-medium text-muted-foreground">
+                      {post.category}
+                    </div>
+                  )}
+                  <h2 className="mb-2 line-clamp-2 text-lg font-semibold group-hover:text-primary">
+                    {post.title}
+                  </h2>
+                  <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
+                    {post.excerpt}
+                  </p>
+                  <div className="flex items-center justify-between text-sm text-muted-foreground">
+                    <span>By {post.author}</span>
+                    <span>{post.date}</span>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </section>
     </MainLayout>
   );
