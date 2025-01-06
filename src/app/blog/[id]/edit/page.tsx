@@ -47,10 +47,13 @@ export default function EditPost({ params }: { params: { id: string } }) {
         description: 'Draft updated successfully',
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Update draft error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update draft. Please try again.',
+        description:
+          error.message || 'Failed to update draft. Please try again.',
+        variant: 'destructive',
       });
     },
   });
@@ -109,10 +112,16 @@ export default function EditPost({ params }: { params: { id: string } }) {
       return;
     }
 
+    // Remove any potentially problematic content
+    const sanitizedContent = content
+      .replace(/javascript:/gi, '')
+      .replace(/data:/gi, '')
+      .replace(/vbscript:/gi, '');
+
     updateDraft.mutate({
       id: params.id,
       title,
-      content,
+      content: sanitizedContent,
     });
   };
 

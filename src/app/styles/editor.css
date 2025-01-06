@@ -1,0 +1,256 @@
+/* Editor styles */
+.editor-wrapper {
+  position: relative;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+/* Remove all Quill borders */
+.ql-container,
+.ql-container.ql-bubble,
+.ql-editor,
+.editor-wrapper .ql-editor,
+[class*='min-h-[500px]'] {
+  border: none !important;
+  outline: none !important;
+}
+
+.editor-wrapper .ql-editor {
+  padding: 1rem;
+  min-height: 500px;
+  font-size: 1.125rem;
+  line-height: 1.75;
+}
+
+.editor-wrapper .ql-editor p {
+  margin-bottom: 1.5rem;
+}
+
+/* Code block styles */
+.ql-editor pre.ql-syntax {
+  background-color: hsl(var(--muted));
+  color: hsl(var(--foreground));
+  overflow-x: auto;
+  padding: 1rem;
+  border-radius: 0.375rem;
+  font-family: 'Fira Code', monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  margin: 1.5rem 0;
+  border: 1px solid hsl(var(--border));
+}
+
+/* Plus button styles */
+.plus-button {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  border: 1px solid black;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease-in-out;
+  background: transparent;
+}
+
+.plus-button:hover {
+  background: transparent;
+}
+
+.plus-button svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 1;
+  transition: transform 0.2s ease-in-out;
+}
+
+.plus-button.open svg {
+  transform: rotate(45deg);
+}
+
+/* Plus menu styles */
+.plus-menu {
+  display: flex;
+  gap: 8px;
+  padding: 0;
+  background-color: transparent;
+  border: none;
+  position: absolute;
+  box-shadow: none;
+  left: 100%;
+  margin-left: 8px;
+  top: 0;
+}
+
+.plus-menu-btn {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid black;
+  border-radius: 4px;
+  color: hsl(var(--foreground));
+  background: white;
+}
+
+.plus-menu-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* .plus-menu-divider {
+  width: 8px;
+  background-color: transparent;
+  margin: 0;
+} */
+
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:before {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -40px;
+  left: 0;
+  transform: none;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  color: hsl(var(--foreground));
+  font-size: 0.75rem;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Special positioning for plus button tooltip */
+.plus-button[data-tooltip]:before {
+  width: max-content;
+  left: 0;
+  transform: none;
+}
+
+[data-tooltip]:hover:before {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Format styles */
+.ql-editor blockquote {
+  border-left: 4px solid hsl(var(--border));
+  margin: 1.5rem 0;
+  padding-left: 1rem;
+  font-style: italic;
+  color: hsl(var(--muted-foreground));
+}
+
+.ql-editor h1 {
+  font-size: 2.25rem;
+  font-weight: 700;
+  margin: 2rem 0 1rem;
+  line-height: 1.2;
+}
+
+.ql-editor h2 {
+  font-size: 1.875rem;
+  font-weight: 700;
+  margin: 1.5rem 0 1rem;
+  line-height: 1.3;
+}
+
+.ql-editor h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 1.25rem 0 1rem;
+  line-height: 1.4;
+}
+
+.ql-editor a {
+  color: hsl(var(--primary));
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+
+.ql-editor a:hover {
+  color: hsl(var(--primary-foreground));
+  text-decoration: underline;
+}
+
+.ql-editor hr {
+  border: none;
+  border-top: 2px solid hsl(var(--border));
+  margin: 2rem 0;
+}
+
+/* Media styles */
+.ql-editor figure {
+  margin: 1.5rem 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ql-editor figure img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.ql-editor figure video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+}
+
+.ql-editor figure audio {
+  width: 100%;
+  margin: 1rem 0;
+}
+
+/* Embed styles */
+.ql-editor .embed-container {
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+.ql-editor .embed-wrapper {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+}
+
+.ql-editor .embed-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 0.5rem;
+}
+
+.ql-editor .embed-wrapper a {
+  display: block;
+  padding: 1rem;
+  background-color: hsl(var(--muted));
+  border-radius: 0.5rem;
+  color: hsl(var(--foreground));
+  text-decoration: none;
+  transition: background-color 0.2s ease-in-out;
+}
+
+.ql-editor .embed-wrapper a:hover {
+  background-color: hsl(var(--accent));
+  color: hsl(var(--accent-foreground));
+}
+
+/* Remove the header since it's not needed in horizontal layout */
+.plus-menu-header {
+  display: none;
+}

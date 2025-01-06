@@ -1,95 +1,70 @@
-'use client';
-
 import Link from 'next/link';
 import Image from 'next/image';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { PlusIcon } from 'lucide-react';
-import { trpc } from '@/lib/trpc';
 import { format } from 'date-fns';
-import { stripHtml } from '@/lib/utils';
+import { truncateHTML } from '@/lib/utils';
+import { PostCard } from '@/components/blog/post-card';
+import { db } from '@/server/db';
+import { mockBlogs } from '@/lib/mock-data';
 
-interface MockPost {
-  id: string;
-  title: string;
-  excerpt: string;
-  author: string;
-  date: string;
-  image: string;
-  category: string;
-  isReal: false;
+const POSTS_PER_PAGE = 6;
+
+// Helper function to extract text content without HTML tags
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '');
 }
 
-interface RealPost {
-  id: string;
-  title: string;
-  excerpt: string;
-  author: string;
-  date: string;
-  isReal: true;
-}
-
-type Post = MockPost | RealPost;
-
-function isMockPost(post: Post): post is MockPost {
-  return !post.isReal;
-}
-
-// Mock data - will be removed later
-const mockBlogs = [
-  {
-    id: '1',
-    title: 'Explore the World: Travel Adventures Await You!',
-    excerpt:
-      'Discover hidden gems and breathtaking destinations that will take you away. From exhilarating backpacking to luxury retreats, every journey has a story to tell.',
-    author: 'Emily Johnson',
-    date: 'Jan 16, 2023',
-    image: '/images/travel.jpg',
-    category: 'Travel Tips',
-  },
-  {
-    id: '2',
-    title: 'Wanderlust: Discover Hidden Gems',
-    excerpt:
-      'Traveling opens up a world of experiences that enrich our lives. From breathtaking landscapes to vibrant cultures, every journey has a story to tell.',
-    author: 'Jane Smith',
-    date: 'Jan 15, 2023',
-    image: '/images/wanderlust.jpg',
-    category: 'Lifestyle Hacks',
-  },
-  {
-    id: '3',
-    title: 'Delicious Recipes for Every Occasion',
-    excerpt:
-      "Cooking is an art, and the kitchen is your canvas. Whether you're looking for quick weeknight meals or elaborate dinner party dishes, we've got you covered.",
-    author: 'Michael Chen',
-    date: 'Jan 14, 2023',
-    image: '/images/cooking.jpg',
-    category: 'Cooking Recipes',
-  },
-];
-
-export default function Home() {
-  const {
-    data: postsData,
-    isLoading,
-    error,
-  } = trpc.posts.getPublishedPosts.useQuery({
-    orderBy: 'createdAt',
-    orderDir: 'desc',
+export default async function Home() {
+  // Server-side data fetching
+  const publishedPosts = await db.post.findMany({
+    where: {
+      published: true,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    take: POSTS_PER_PAGE,
+    include: {
+      author: {
+        select: {
+          name: true,
+          image: true,
+        },
+      },
+    },
   });
 
-  // Combine mock and real posts
-  const allPosts: Post[] = [
-    ...(postsData?.items || []).map((post) => ({
+  // Transform posts for display
+  const transformedPosts = publishedPosts.map((post) => {
+    // Extract image URL first
+    const imageUrl =
+      post.content
+        .match(/<img[^>]+src="([^">]+)"/)?.[1]
+        ?.replace('http://localhost:3000', '') || '';
+
+    // Remove image tag from content before creating excerpt
+    const contentWithoutImage = post.content.replace(
+      /<figure>[^]*?<\/figure>/,
+      ''
+    );
+
+    return {
       id: post.id,
       title: post.title,
-      excerpt: stripHtml(post.content).substring(0, 150) + '...',
+      excerpt: truncateHTML(stripHtml(contentWithoutImage), 150),
       author: post.author?.name || 'Anonymous',
-      date: format(new Date(post.createdAt), 'MMM d, yyyy'),
+      date: format(post.createdAt, 'MMM d, yyyy'),
+      image: imageUrl,
       isReal: true as const,
-    })),
-    ...mockBlogs.map((blog) => ({
+    };
+  });
+
+  // Combine with mock data (will be removed later)
+  const allPosts = [
+    ...transformedPosts,
+    ...mockBlogs.map((blog: (typeof mockBlogs)[0]) => ({
       ...blog,
       isReal: false as const,
     })),
@@ -158,66 +133,11 @@ export default function Home() {
           </Link>
         </div>
 
-        {isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <div
-                key={i}
-                className="animate-pulse overflow-hidden rounded-lg border bg-card"
-              >
-                <div className="h-48 bg-muted" />
-                <div className="space-y-3 p-4">
-                  <div className="h-4 w-1/4 rounded bg-muted" />
-                  <div className="h-6 w-3/4 rounded bg-muted" />
-                  <div className="h-4 w-full rounded bg-muted" />
-                  <div className="flex justify-between">
-                    <div className="h-4 w-1/3 rounded bg-muted" />
-                    <div className="h-4 w-1/4 rounded bg-muted" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {allPosts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/blog/${post.id}`}
-                className="group block overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md"
-              >
-                {isMockPost(post) && (
-                  <div className="relative h-48 w-full overflow-hidden">
-                    <Image
-                      src={post.image}
-                      alt={post.title}
-                      width={400}
-                      height={225}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                )}
-                <div className="p-4">
-                  {isMockPost(post) && (
-                    <div className="mb-2 text-sm font-medium text-muted-foreground">
-                      {post.category}
-                    </div>
-                  )}
-                  <h2 className="mb-2 line-clamp-2 text-lg font-semibold group-hover:text-primary">
-                    {post.title}
-                  </h2>
-                  <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
-                    {post.excerpt}
-                  </p>
-                  <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>By {post.author}</span>
-                    <span>{post.date}</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {allPosts.map((post) => (
+            <PostCard key={post.id} post={post} />
+          ))}
+        </div>
       </section>
     </MainLayout>
   );

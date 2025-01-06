@@ -5,13 +5,27 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function stripHtml(html: string): string {
-  // Create a temporary div element
-  if (typeof document !== 'undefined') {
-    const div = document.createElement('div');
-    div.innerHTML = html;
-    return div.textContent || div.innerText || '';
+export function extractFirstImage(content: string): string | null {
+  const imgRegex = /<img[^>]+src="([^">]+)"/;
+  const match = content.match(imgRegex);
+  return match ? match[1] : null;
+}
+
+export function truncateHTML(html: string, maxLength: number): string {
+  // Remove HTML tags for length calculation
+  const textContent = html.replace(/<[^>]*>/g, '');
+
+  if (textContent.length <= maxLength) {
+    return html;
   }
-  // Fallback for server-side
-  return html.replace(/<[^>]*>/g, '');
+
+  // Find the last space before maxLength
+  const truncated = textContent.substring(0, maxLength);
+  const lastSpace = truncated.lastIndexOf(' ');
+
+  if (lastSpace === -1) {
+    return truncated + '...';
+  }
+
+  return truncated.substring(0, lastSpace) + '...';
 }

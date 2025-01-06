@@ -9,7 +9,10 @@ import slugify from 'slugify';
 
 const postInput = z.object({
   title: z.string().min(1, 'Title is required'),
-  content: z.string().min(1, 'Content is required'),
+  content: z
+    .string()
+    .min(1, 'Content is required')
+    .max(5000000, 'Content is too large'),
 });
 
 export const postsRouter = createTRPCRouter({
@@ -193,52 +196,76 @@ export const postsRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         title: z.string().min(1, 'Title is required'),
-        content: z.string().min(1, 'Content is required'),
+        content: z
+          .string()
+          .min(1, 'Content is required')
+          .max(5000000, 'Content is too large'),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, title, content } = input;
+      try {
+        const { id, title, content } = input;
 
-      const post = await ctx.db.post.findUnique({
-        where: { id },
-        select: { authorId: true, published: true },
-      });
+        console.log('Updating draft with:', {
+          id,
+          titleLength: title.length,
+          contentLength: content.length,
+        });
 
-      if (!post) {
+        const post = await ctx.db.post.findUnique({
+          where: { id },
+          select: { authorId: true, published: true },
+        });
+
+        if (!post) {
+          console.error('Post not found:', id);
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Post not found',
+          });
+        }
+
+        if (post.authorId !== ctx.session.user.id) {
+          console.error('Unauthorized edit attempt:', {
+            postAuthor: post.authorId,
+            currentUser: ctx.session.user.id,
+          });
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Not authorized to edit this post',
+          });
+        }
+
+        const updatedDraft = await ctx.db.post.update({
+          where: { id },
+          data: {
+            title,
+            content,
+            published: false,
+            updatedAt: new Date(),
+          },
+        });
+
+        console.log('Post converted to draft and updated successfully:', id);
+
+        return {
+          status: 200,
+          message: post.published
+            ? 'Published post converted to draft and updated'
+            : 'Draft updated successfully',
+          data: updatedDraft,
+        };
+      } catch (error) {
+        console.error('Error updating post:', error);
+        if (error instanceof TRPCError) {
+          throw error;
+        }
         throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Draft not found',
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to update post',
+          cause: error,
         });
       }
-
-      if (post.authorId !== ctx.session.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Not authorized to edit this draft',
-        });
-      }
-
-      if (post.published) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot update a published post as draft',
-        });
-      }
-
-      const updatedDraft = await ctx.db.post.update({
-        where: { id },
-        data: {
-          title,
-          content,
-          updatedAt: new Date(),
-        },
-      });
-
-      return {
-        status: 200,
-        message: 'Draft updated successfully',
-        data: updatedDraft,
-      };
     }),
 
   deleteDraft: protectedProcedure
