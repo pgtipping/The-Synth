@@ -38,38 +38,33 @@ export default function QuillEditor({
   } | null>(null);
 
   useEffect(() => {
-    if (quillRef.current) {
-      const initQuill = async () => {
-        // Register formats on the client side
-        await registerFormats();
+    const initQuill = async () => {
+      if (!quillRef.current) return;
 
-        const quill = quillRef.current;
-        if (!quill) return;
+      // Register formats on the client side
+      await registerFormats();
 
-        const editor = quill.getEditor();
+      const editor = quillRef.current.getEditor();
 
-        // Configure Quill for Medium-like experience
-        editor.root.dataset.placeholder = placeholder || 'Tell your story...';
+      // Configure Quill for Medium-like experience
+      editor.root.dataset.placeholder = placeholder || 'Tell your story...';
 
-        // Handle selection changes
-        editor.on('selection-change', (range) => {
-          if (range) {
-            // Only update selection if there is a range
-            setSelection(range);
-          } else {
-            // Clear selection when nothing is selected
-            setSelection(null);
-          }
-        });
-      };
+      // Handle selection changes
+      editor.on('selection-change', (range) => {
+        if (range && range.length > 0) {
+          setSelection(range);
+        } else {
+          setSelection(null);
+        }
+      });
+    };
 
-      initQuill().catch(console.error);
-    }
-  }, [placeholder]);
+    initQuill();
+  }, [placeholder, quillRef.current]);
 
   return (
     <>
-      <div className="editor-wrapper">
+      <div className="editor-wrapper relative">
         <ReactQuillComponent
           forwardedRef={quillRef}
           theme="bubble"
@@ -91,11 +86,13 @@ export default function QuillEditor({
           formats={[
             'bold',
             'italic',
+            'underline',
+            'strike',
             'link',
             'blockquote',
             'header',
-            'divider',
             'code-block',
+            'divider',
             'image',
             'video',
             'audio',
@@ -103,7 +100,7 @@ export default function QuillEditor({
           ]}
         />
 
-        {quillRef.current && (
+        {quillRef.current && selection && (
           <FloatingToolbar quill={quillRef.current} selection={selection} />
         )}
       </div>
