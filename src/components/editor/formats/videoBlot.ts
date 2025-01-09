@@ -1,27 +1,38 @@
 'use client';
 
 import Quill from 'quill';
-import type { BlockBlotConstructor } from './types';
+import type { BlockEmbedConstructor } from './types';
 
-const BlockEmbed = Quill.import('blots/block/embed') as BlockBlotConstructor;
+const BlockEmbed = Quill.import('blots/block/embed') as BlockEmbedConstructor;
+
+interface VideoFormat {
+  height?: string;
+  width?: string;
+}
 
 export default class VideoBlot extends BlockEmbed {
   static blotName = 'video';
-  static tagName = 'figure';
+  static tagName = 'iframe';
 
   static create(url: string) {
     const node = super.create() as HTMLElement;
-    const video = document.createElement('video');
-    video.setAttribute('src', url);
-    video.setAttribute('controls', 'true');
-    video.setAttribute('preload', 'metadata');
-    video.className = 'w-full rounded-lg';
-    node.appendChild(video);
+    node.setAttribute('src', url);
+    node.setAttribute('frameborder', '0');
+    node.setAttribute('allowfullscreen', 'true');
     return node;
   }
 
-  static value(node: HTMLElement) {
-    const video = node.querySelector('video');
-    return video?.getAttribute('src') || '';
+  static formats(node: HTMLElement): VideoFormat {
+    // We still need to report unregistered embed formats
+    const format: VideoFormat = {};
+    if (node.hasAttribute('height')) {
+      const height = node.getAttribute('height');
+      if (height) format.height = height;
+    }
+    if (node.hasAttribute('width')) {
+      const width = node.getAttribute('width');
+      if (width) format.width = width;
+    }
+    return format;
   }
 }

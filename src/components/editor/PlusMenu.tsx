@@ -1,6 +1,6 @@
 'use client';
 
-import ReactQuill from 'react-quill';
+import ReactQuill, { Quill } from 'react-quill';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Icons } from '../icons';
@@ -224,46 +224,188 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
   };
 
   const handleVideoUpload = async (): Promise<void> => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'video/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (file) {
-        try {
-          setIsUploading(true);
-          const url = await uploadFile(file, 'video');
-          const editor = quill.getEditor();
-          const selection = editor.getSelection(true) as RangeStatic;
-          editor.insertEmbed(selection.index, 'video', {
-            url: url,
-          });
-          editor.setSelection(selection.index + 1, 0);
-          toast({
-            title: 'Success',
-            description: 'Video uploaded successfully',
-          });
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message === 'File size exceeds limit'
-          ) {
-            // Already handled by validateFileSize
-            return;
+    // Create a dialog for video options
+    const dialog = document.createElement('div');
+    dialog.className =
+      'fixed inset-0 flex items-center justify-center bg-black/50 z-[9999]';
+    dialog.innerHTML = `
+      <div class="bg-background rounded-lg shadow-lg w-[400px] p-4">
+        <div class="flex border-b mb-4">
+          <button class="px-4 py-2 text-foreground border-b-2 border-primary">Embed link</button>
+          <button class="px-4 py-2 text-muted-foreground">Upload</button>
+        </div>
+        <div class="space-y-4">
+          <input type="text" placeholder="Paste the video link..." class="w-full px-3 py-2 rounded-md border bg-background text-foreground" />
+          <div class="text-sm text-muted-foreground">Works with YouTube, Vimeo, Instagram, and TikTok</div>
+          <button class="w-full bg-primary text-primary-foreground rounded-md py-2">Embed video</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Get elements
+    const embedTab = dialog.querySelector(
+      'button:first-child'
+    ) as HTMLButtonElement;
+    const uploadTab = dialog.querySelector(
+      'button:nth-child(2)'
+    ) as HTMLButtonElement;
+    const input = dialog.querySelector('input') as HTMLInputElement;
+    const embedButton = dialog.querySelector(
+      '.bg-primary'
+    ) as HTMLButtonElement;
+
+    // Handle embed
+    embedButton.onclick = async () => {
+      const url = input.value.trim();
+      if (!url) return;
+
+      try {
+        const urlObj = new URL(url);
+        let embedUrl: string;
+
+        // YouTube
+        if (
+          urlObj.hostname.includes('youtube.com') ||
+          urlObj.hostname.includes('youtu.be')
+        ) {
+          const videoId = url.split('v=')[1];
+          if (!videoId) {
+            throw new Error('Could not find YouTube video ID');
           }
-          console.error('Video upload failed:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to upload video. Please try again.',
-            variant: 'destructive',
-          });
-        } finally {
-          setIsUploading(false);
+          const ampersandPosition = videoId.indexOf('&');
+          const cleanVideoId =
+            ampersandPosition !== -1
+              ? videoId.substring(0, ampersandPosition)
+              : videoId;
+          embedUrl = `https://www.youtube.com/embed/${cleanVideoId}`;
         }
+        // Vimeo
+        else if (urlObj.hostname.includes('vimeo.com')) {
+          const videoId = urlObj.pathname.split('/').pop();
+          if (!videoId) {
+            throw new Error('Could not find Vimeo video ID');
+          }
+          embedUrl = `https://player.vimeo.com/video/${videoId}`;
+        }
+        // Instagram
+        else if (urlObj.hostname.includes('instagram.com')) {
+          const postId = urlObj.pathname.split('/p/')[1]?.split('/')[0];
+          if (!postId) {
+            throw new Error('Could not find Instagram post ID');
+          }
+          embedUrl = `https://www.instagram.com/p/${postId}/embed`;
+        }
+        // TikTok
+        else if (urlObj.hostname.includes('tiktok.com')) {
+          const videoId = urlObj.pathname.split('/video/')[1];
+          if (!videoId) {
+            throw new Error('Could not find TikTok video ID');
+          }
+          embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
+        } else {
+          throw new Error(
+            'Unsupported video platform. We support YouTube, Vimeo, Instagram, and TikTok.'
+          );
+        }
+
+        const editor = quill.getEditor();
+        const selection = editor.getSelection(true) as RangeStatic;
+
+        // 1. Insert newline
+        editor.insertText(selection.index, '\n', (Quill as any).sources.USER);
+
+        // 2. Insert embed at next position
+        editor.insertEmbed(
+          selection.index + 1,
+          'video',
+          embedUrl,
+          (Quill as any).sources.USER
+        );
+
+        // 3. Format with dimensions
+        editor.formatText(selection.index + 1, 1, {
+          height: '170',
+          width: '400',
+        });
+
+        // 4. Move cursor after embed
+        editor.setSelection(
+          selection.index + 2,
+          0,
+          (Quill as any).sources.SILENT
+        );
+
+        toast({
+          title: 'Success',
+          description: 'Video embedded successfully',
+        });
+      } catch (error) {
+        console.error('Video embed failed:', error);
+        toast({
+          title: 'Error',
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Failed to embed video. Please check the URL and try again.',
+          variant: 'destructive',
+        });
+      }
+
+      document.body.removeChild(dialog);
+      onClose();
+    };
+
+    // Handle upload tab click
+    uploadTab.onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'video/*';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (file) {
+          try {
+            setIsUploading(true);
+            const url = await uploadFile(file, 'video');
+            const editor = quill.getEditor();
+            const selection = editor.getSelection(true) as RangeStatic;
+            editor.insertEmbed(selection.index, 'video', url, 'user');
+            editor.setSelection(selection.index + 1, 0);
+            toast({
+              title: 'Success',
+              description: 'Video uploaded successfully',
+            });
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message === 'File size exceeds limit'
+            ) {
+              // Already handled by validateFileSize
+              return;
+            }
+            console.error('Video upload failed:', error);
+            toast({
+              title: 'Error',
+              description: 'Failed to upload video. Please try again.',
+              variant: 'destructive',
+            });
+          } finally {
+            setIsUploading(false);
+          }
+        }
+        document.body.removeChild(dialog);
+      };
+      input.click();
+    };
+
+    // Handle dialog close
+    dialog.onclick = (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog);
+        onClose();
       }
     };
-    input.click();
-    onClose();
   };
 
   const handleEmbedInsert = (): void => {
