@@ -58,69 +58,123 @@ export const postsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { id, title, content } = input;
+      try {
+        const { id, title, content } = input;
 
-      if (id) {
-        // Update existing post
-        const post = await ctx.db.post.findUnique({
-          where: { id },
-          select: { authorId: true },
-        });
-
-        if (!post) {
+        // Validate session and user
+        if (!ctx.session?.user?.id) {
+          console.error('No user in session');
           throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Post not found',
+            code: 'UNAUTHORIZED',
+            message: 'You must be logged in to publish',
           });
         }
 
-        if (post.authorId !== ctx.session.user.id) {
+        // Verify user exists
+        const user = await ctx.db.user.findUnique({
+          where: { id: ctx.session.user.id },
+          select: { id: true },
+        });
+
+        if (!user) {
+          console.error('User not found:', ctx.session.user.id);
           throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Not authorized to edit this post',
+            code: 'UNAUTHORIZED',
+            message: 'User not found',
           });
         }
 
-        const updatedPost = await ctx.db.post.update({
-          where: { id },
-          data: {
-            title,
-            content,
-            published: true,
-          },
+        console.log('Publishing post:', {
+          id,
+          titleLength: title.length,
+          contentLength: content.length,
+          userId: ctx.session.user.id,
         });
 
-        return {
-          status: 200,
-          message: 'Post published successfully',
-          data: updatedPost,
-        };
-      } else {
-        // Create new published post
-        const baseSlug = slugify(title, { lower: true, strict: true });
-        let slug = baseSlug;
-        let counter = 1;
+        if (id) {
+          // Update existing post
+          const post = await ctx.db.post.findUnique({
+            where: { id },
+            select: { authorId: true },
+          });
 
-        while (await ctx.db.post.findUnique({ where: { slug } })) {
-          slug = `${baseSlug}-${counter}`;
-          counter++;
+          if (!post) {
+            console.error('Post not found:', id);
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: 'Post not found',
+            });
+          }
+
+          if (post.authorId !== ctx.session.user.id) {
+            console.error('Unauthorized publish attempt:', {
+              postAuthor: post.authorId,
+              currentUser: ctx.session.user.id,
+            });
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Not authorized to edit this post',
+            });
+          }
+
+          const updatedPost = await ctx.db.post.update({
+            where: { id },
+            data: {
+              title,
+              content,
+              published: true,
+              updatedAt: new Date(),
+            },
+          });
+
+          console.log('Post updated and published successfully:', id);
+
+          return {
+            status: 200,
+            message: 'Post published successfully',
+            data: updatedPost,
+          };
+        } else {
+          // Create new published post
+          const baseSlug = slugify(title, { lower: true, strict: true });
+          let slug = baseSlug;
+          let counter = 1;
+
+          while (await ctx.db.post.findUnique({ where: { slug } })) {
+            slug = `${baseSlug}-${counter}`;
+            counter++;
+          }
+
+          console.log('Creating new published post with slug:', slug);
+
+          const post = await ctx.db.post.create({
+            data: {
+              title,
+              content,
+              slug,
+              published: true,
+              authorId: ctx.session.user.id,
+            },
+          });
+
+          console.log('New post created and published successfully:', post.id);
+
+          return {
+            status: 201,
+            message: 'Post published successfully',
+            data: post,
+          };
         }
-
-        const post = await ctx.db.post.create({
-          data: {
-            title,
-            content,
-            slug,
-            published: true,
-            authorId: ctx.session.user.id,
-          },
+      } catch (error) {
+        console.error('Error publishing post:', error);
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to publish post',
+          cause: error,
         });
-
-        return {
-          status: 201,
-          message: 'Post published successfully',
-          data: post,
-        };
       }
     }),
 

@@ -25,7 +25,7 @@ export default function CreatePost() {
         title: 'Success',
         description: 'Draft saved successfully',
       });
-      router.push(`/blog/${result.data.id}/edit`);
+      router.push(`/drafts/${result.data.id}/edit`);
     },
     onError: () => {
       toast({
@@ -43,10 +43,12 @@ export default function CreatePost() {
       });
       router.push(`/blog/${result.data.id}`);
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Publish error:', error);
       toast({
         title: 'Error',
-        description: 'Failed to publish. Please try again.',
+        description: error.message || 'Failed to publish. Please try again.',
+        variant: 'destructive',
       });
     },
   });
@@ -75,10 +77,29 @@ export default function CreatePost() {
       return;
     }
 
-    publish.mutate({
-      title,
-      content,
-    });
+    try {
+      console.log('Publishing post with:', {
+        titleLength: title.length,
+        contentLength: content.length,
+      });
+
+      const sanitizedContent = content
+        .replace(/javascript:/gi, '')
+        .replace(/data:/gi, '')
+        .replace(/vbscript:/gi, '');
+
+      publish.mutate({
+        title,
+        content: sanitizedContent,
+      });
+    } catch (error) {
+      console.error('Error in handlePublish:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to publish. Please try again.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handlePreview = async () => {
@@ -95,7 +116,7 @@ export default function CreatePost() {
       content,
     });
 
-    window.open(`/blog/preview/${result.data.id}`, '_blank');
+    window.open(`/drafts/preview/${result.data.id}`, '_blank');
   };
 
   return (

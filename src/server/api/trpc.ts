@@ -22,11 +22,27 @@ export const createTRPCContext = async (opts: {
   req?: Request;
   res?: Response;
 }) => {
-  const session = await getServerSession(authOptions);
+  try {
+    const session = await getServerSession(authOptions);
 
-  return createInnerTRPCContext({
-    session,
-  });
+    if (!session?.user) {
+      console.error('No session or user found in context');
+    } else {
+      console.log('Session found:', {
+        userId: session.user.id,
+        email: session.user.email,
+      });
+    }
+
+    return createInnerTRPCContext({
+      session,
+    });
+  } catch (error) {
+    console.error('Error getting session:', error);
+    return createInnerTRPCContext({
+      session: null,
+    });
+  }
 };
 
 const t = initTRPC.context<typeof createTRPCContext>().create({
@@ -49,11 +65,14 @@ export const publicProcedure = t.procedure;
 
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.session?.user) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' });
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to perform this action',
+    });
   }
   return next({
     ctx: {
-      session: ctx.session,
+      session: { ...ctx.session, user: ctx.session.user },
     },
   });
 });

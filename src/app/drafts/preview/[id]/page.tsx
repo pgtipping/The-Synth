@@ -100,13 +100,13 @@ export default function PreviewPost({ params }: { params: { id: string } }) {
     <MainLayout>
       <div className="mx-auto max-w-4xl px-4 py-8 md:px-8">
         <div className="mb-8 flex items-center justify-between">
-          <Link href={`/blog/${params.id}/edit`} className="nav-button">
+          <Link href={`/drafts/${params.id}/edit`} className="nav-button">
             <ArrowLeftIcon className="icon-sm mr-2" />
             Back to Editor
           </Link>
           <div className="flex items-center gap-2">
             <Button variant="outline" asChild>
-              <Link href={`/blog/${params.id}/edit`}>Edit</Link>
+              <Link href={`/drafts/${params.id}/edit`}>Edit</Link>
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>

@@ -42,7 +42,7 @@ export function MainLayout({ children, className, ...props }: MainLayoutProps) {
             {session ? (
               <>
                 <Link
-                  href="/blog/drafts"
+                  href="/drafts"
                   className="text-muted-foreground hover:text-foreground"
                 >
                   My Drafts

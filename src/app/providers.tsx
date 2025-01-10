@@ -29,7 +29,7 @@ export function Providers({ children }: ProvidersProps) {
     trpc.createClient({
       links: [
         httpBatchLink({
-          url: `${process.env.NEXT_PUBLIC_APP_URL}/api/trpc`,
+          url: '/api/trpc',
           transformer: superjson,
         }),
       ],
