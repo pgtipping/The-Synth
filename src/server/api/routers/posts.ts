@@ -143,6 +143,22 @@ export const postsRouter = createTRPCRouter({
         throw new Error('Post not found');
       }
 
+      // Transform any S3 signed URLs to direct URLs in the content
+      if (post.content) {
+        post.content = post.content.replace(
+          /https:\/\/[^"']*?amazonaws\.com\/[^"']*/g,
+          (url) => {
+            // Extract the key from the URL (everything after the bucket name)
+            const key = url.split('.amazonaws.com/')[1]?.split('?')[0];
+            if (key) {
+              // Return the direct URL
+              return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+            }
+            return url;
+          }
+        );
+      }
+
       return post;
     }),
 

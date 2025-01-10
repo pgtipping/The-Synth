@@ -28,8 +28,10 @@
 *.log
 .cursorrules
 .cursorignore
-/.notes/
+/.notes/*
 .md
+/public/*
+/docs/*
 
 
 # debug

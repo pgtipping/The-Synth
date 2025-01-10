@@ -37,7 +37,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
   return (
     <MainLayout>
       <div className="bg-gray-50/50 dark:bg-gray-900/50">
-        <article className="mx-auto max-w-4xl px-4 py-12 md:px-8">
+        <article className="mx-auto max-w-[700px] px-4 py-12 md:px-8">
           {isLoading ? (
             <div className="animate-pulse space-y-8">
               <div className="h-8 w-48 rounded bg-muted" />
@@ -68,7 +68,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
               </div>
 
               <div className="overflow-hidden rounded-lg bg-background shadow-sm">
-                <div className="border-b bg-muted/30 px-8 py-6">
+                <div className="border-b bg-muted/30 px-4 py-6">
                   <div className="space-y-4">
                     <h1 className="text-4xl font-bold tracking-tight lg:text-5xl">
                       {post.title}
@@ -94,9 +94,9 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                   </div>
                 </div>
 
-                <div className="p-8">
+                <div className="p-2">
                   <div
-                    className="prose prose-lg prose-gray dark:prose-invert mx-auto max-w-none"
+                    className="prose prose-lg prose-gray dark:prose-invert mx-auto max-w-[700px]"
                     dangerouslySetInnerHTML={{ __html: post.content }}
                   />
                 </div>

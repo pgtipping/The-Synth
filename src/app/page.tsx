@@ -38,11 +38,19 @@ export default async function Home() {
 
   // Transform posts for display
   const transformedPosts = publishedPosts.map((post) => {
-    // Extract image URL first
-    const imageUrl =
-      post.content
-        .match(/<img[^>]+src="([^">]+)"/)?.[1]
-        ?.replace('http://localhost:3000', '') || '';
+    // Extract image URL from content
+    const imageMatch = post.content.match(/<img[^>]+src="([^">]+)"/);
+    let imageUrl = imageMatch ? imageMatch[1] : '';
+
+    // If it's an S3 URL, remove the signed URL parameters
+    if (imageUrl.includes('synthalyst-blog-media-dev.s3')) {
+      imageUrl = imageUrl.split('?')[0];
+    }
+
+    // Debug log
+    console.log('Post ID:', post.id);
+    console.log('Post content:', post.content);
+    console.log('Extracted image URL:', imageUrl);
 
     // Remove image tag from content before creating excerpt
     const contentWithoutImage = post.content.replace(

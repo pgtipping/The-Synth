@@ -15,6 +15,9 @@ interface Post {
 }
 
 export function PostCard({ post }: { post: Post }) {
+  // Debug log
+  console.log('PostCard image URL:', post.image);
+
   return (
     <Link
       href={`/blog/${post.id}`}
@@ -23,11 +26,15 @@ export function PostCard({ post }: { post: Post }) {
       {post.image && (
         <div className="relative h-48 w-full overflow-hidden">
           <Image
-            src={post.image}
+            src={post.image.replace(/&amp;/g, '&')}
             alt={post.title}
             width={400}
             height={225}
             className="h-full w-full object-cover"
+            onError={(e) => {
+              console.error('Error loading image:', post.image);
+              e.currentTarget.style.display = 'none';
+            }}
           />
         </div>
       )}

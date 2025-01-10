@@ -39,7 +39,9 @@ interface RangeStatic {
 }
 
 interface UploadResponse {
+  success: boolean;
   url: string;
+  key: string;
   error?: string;
 }
 
@@ -172,7 +174,7 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
 
     const data: UploadResponse = await response.json();
 
-    if (data.error || !data.url) {
+    if (!data.success || !data.url) {
       throw new Error(data.error || 'Upload failed');
     }
 
@@ -180,47 +182,160 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
   };
 
   const handleImageUpload = async (): Promise<void> => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (file) {
-        try {
-          setIsUploading(true);
-          const url = await uploadFile(file, 'image');
-          const editor = quill.getEditor();
-          const selection = editor.getSelection(true) as RangeStatic;
-          editor.insertEmbed(selection.index, 'image', {
-            alt: file.name,
-            url: url,
-          });
-          editor.setSelection(selection.index + 1, 0);
-          toast({
-            title: 'Success',
-            description: 'Image uploaded successfully',
-          });
-        } catch (error) {
-          if (
-            error instanceof Error &&
-            error.message === 'File size exceeds limit'
-          ) {
-            // Already handled by validateFileSize
-            return;
-          }
-          console.error('Image upload failed:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to upload image. Please try again.',
-            variant: 'destructive',
-          });
-        } finally {
-          setIsUploading(false);
+    // Create a dialog for image options
+    const dialog = document.createElement('div');
+    dialog.className =
+      'fixed inset-0 flex items-center justify-center bg-black/50 z-[9999]';
+    dialog.innerHTML = `
+      <div class="bg-background rounded-lg shadow-lg w-[400px] p-4">
+        <div class="flex border-b mb-4">
+          <button class="px-4 py-2 text-foreground border-b-2 border-primary">URL</button>
+          <button class="px-4 py-2 text-muted-foreground">Upload</button>
+        </div>
+        <div class="space-y-4">
+          <input type="text" placeholder="Paste the image URL..." class="w-full px-3 py-2 rounded-md border bg-background text-foreground" />
+          <div class="text-sm text-muted-foreground">Supported formats: JPG, PNG, GIF, WebP</div>
+          <button class="w-full bg-primary text-primary-foreground rounded-md py-2">Add image</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(dialog);
+
+    // Get elements
+    const urlTab = dialog.querySelector(
+      'button:first-child'
+    ) as HTMLButtonElement;
+    const uploadTab = dialog.querySelector(
+      'button:nth-child(2)'
+    ) as HTMLButtonElement;
+    const input = dialog.querySelector('input') as HTMLInputElement;
+    const addButton = dialog.querySelector('.bg-primary') as HTMLButtonElement;
+
+    // Handle URL insert
+    addButton.onclick = async () => {
+      const url = input.value.trim();
+      if (!url) return;
+
+      try {
+        // Validate URL
+        const urlObj = new URL(url);
+        const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlObj.pathname);
+        if (!isImage) {
+          throw new Error(
+            'URL must point to an image file (JPG, PNG, GIF, WebP)'
+          );
         }
+
+        const editor = quill.getEditor();
+        const selection = editor.getSelection(true) as RangeStatic;
+
+        // Insert newline before image
+        editor.insertText(selection.index, '\n', (Quill as any).sources.USER);
+
+        // Insert image with URL only
+        editor.insertEmbed(
+          selection.index + 1,
+          'image',
+          url,
+          (Quill as any).sources.USER
+        );
+
+        // Move cursor after image
+        editor.setSelection(
+          selection.index + 2,
+          0,
+          (Quill as any).sources.SILENT
+        );
+
+        toast({
+          title: 'Success',
+          description: 'Image added successfully',
+        });
+      } catch (error) {
+        console.error('Image URL insert failed:', error);
+        toast({
+          title: 'Error',
+          description:
+            error instanceof Error ? error.message : 'Invalid image URL',
+          variant: 'destructive',
+        });
+      }
+
+      document.body.removeChild(dialog);
+      onClose();
+    };
+
+    // Handle upload tab click
+    uploadTab.onclick = () => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async () => {
+        const file = input.files?.[0];
+        if (file) {
+          try {
+            setIsUploading(true);
+            const url = await uploadFile(file, 'image');
+            const editor = quill.getEditor();
+            const selection = editor.getSelection(true) as RangeStatic;
+
+            // Insert newline before image
+            editor.insertText(
+              selection.index,
+              '\n',
+              (Quill as any).sources.USER
+            );
+
+            // Insert image with URL only
+            editor.insertEmbed(
+              selection.index + 1,
+              'image',
+              url,
+              (Quill as any).sources.USER
+            );
+
+            // Move cursor after image
+            editor.setSelection(
+              selection.index + 2,
+              0,
+              (Quill as any).sources.SILENT
+            );
+
+            toast({
+              title: 'Success',
+              description: 'Image uploaded successfully',
+            });
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message === 'File size exceeds limit'
+            ) {
+              // Already handled by validateFileSize
+              return;
+            }
+            console.error('Image upload failed:', error);
+            toast({
+              title: 'Error',
+              description: 'Failed to upload image. Please try again.',
+              variant: 'destructive',
+            });
+          } finally {
+            setIsUploading(false);
+          }
+        }
+        document.body.removeChild(dialog);
+      };
+      input.click();
+    };
+
+    // Handle dialog close
+    dialog.onclick = (e) => {
+      if (e.target === dialog) {
+        document.body.removeChild(dialog);
+        onClose();
       }
     };
-    input.click();
-    onClose();
   };
 
   const handleVideoUpload = async (): Promise<void> => {
