@@ -51,6 +51,24 @@ export function PostActions({
     },
   });
 
+  const deleteDraft = trpc.posts.deleteDraft.useMutation({
+    onSuccess: (data) => {
+      toast({
+        title: 'Success',
+        description: data.message,
+      });
+      router.refresh();
+      router.push('/drafts');
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const handlePublishToggle = () => {
     togglePublish.mutate({
       id: postId,
@@ -58,13 +76,20 @@ export function PostActions({
     });
   };
 
+  const handleDelete = () => {
+    deleteDraft.mutate({ id: postId });
+  };
+
+  const handleEditClick = () => {
+    const editPath = published
+      ? `/blog/${postId}/edit`
+      : `/drafts/${postId}/edit`;
+    router.push(editPath);
+  };
+
   return (
     <div className="flex items-center gap-2">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => router.push(`/blog/${postId}/edit`)}
-      >
+      <Button variant="outline" size="sm" onClick={handleEditClick}>
         <EditIcon className="icon-sm mr-2" />
         Edit
       </Button>
@@ -113,14 +138,36 @@ export function PostActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Button
-        variant="outline"
-        size="sm"
-        className="text-destructive hover:bg-destructive/10"
-      >
-        <TrashIcon className="icon-sm mr-2" />
-        Delete
-      </Button>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:bg-destructive/10"
+          >
+            <TrashIcon className="icon-sm mr-2" />
+            Delete
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Post?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete your
+              post.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

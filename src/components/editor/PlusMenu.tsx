@@ -1,11 +1,14 @@
 'use client';
 
-import ReactQuill, { Quill } from 'react-quill';
+import ReactQuill from 'react-quill';
 import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Icons } from '../icons';
 import { Image, Video, Code, Link as LinkIcon, Plus } from 'lucide-react';
 import { useToast } from '../ui/use-toast';
+
+// Define source type
+type QuillSource = 'user' | 'silent' | 'api';
 
 // Add editor-specific icons
 const EditorIcons = {
@@ -15,6 +18,12 @@ const EditorIcons = {
   code: Code,
   link: LinkIcon,
   plus: Plus,
+} as const;
+
+// Define Quill sources
+const QUILL_SOURCES = {
+  USER: 'user' as QuillSource,
+  SILENT: 'silent' as QuillSource,
 } as const;
 
 // File size limits in bytes
@@ -231,22 +240,18 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
         const selection = editor.getSelection(true) as RangeStatic;
 
         // Insert newline before image
-        editor.insertText(selection.index, '\n', (Quill as any).sources.USER);
+        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
 
         // Insert image with URL only
         editor.insertEmbed(
           selection.index + 1,
           'image',
           url,
-          (Quill as any).sources.USER
+          QUILL_SOURCES.USER
         );
 
         // Move cursor after image
-        editor.setSelection(
-          selection.index + 2,
-          0,
-          (Quill as any).sources.SILENT
-        );
+        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
 
         toast({
           title: 'Success',
@@ -281,26 +286,13 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
             const selection = editor.getSelection(true) as RangeStatic;
 
             // Insert newline before image
-            editor.insertText(
-              selection.index,
-              '\n',
-              (Quill as any).sources.USER
-            );
+            editor.insertText(selection.index, '\n', 'user');
 
             // Insert image with URL only
-            editor.insertEmbed(
-              selection.index + 1,
-              'image',
-              url,
-              (Quill as any).sources.USER
-            );
+            editor.insertEmbed(selection.index + 1, 'image', url, 'user');
 
             // Move cursor after image
-            editor.setSelection(
-              selection.index + 2,
-              0,
-              (Quill as any).sources.SILENT
-            );
+            editor.setSelection(selection.index + 2, 0, 'silent');
 
             toast({
               title: 'Success',
@@ -428,29 +420,19 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
         const editor = quill.getEditor();
         const selection = editor.getSelection(true) as RangeStatic;
 
-        // 1. Insert newline
-        editor.insertText(selection.index, '\n', (Quill as any).sources.USER);
+        // Insert newline before video
+        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
 
-        // 2. Insert embed at next position
+        // Insert video embed
         editor.insertEmbed(
           selection.index + 1,
           'video',
           embedUrl,
-          (Quill as any).sources.USER
+          QUILL_SOURCES.USER
         );
 
-        // 3. Format with dimensions
-        editor.formatText(selection.index + 1, 1, {
-          height: '170',
-          width: '400',
-        });
-
-        // 4. Move cursor after embed
-        editor.setSelection(
-          selection.index + 2,
-          0,
-          (Quill as any).sources.SILENT
-        );
+        // Move cursor after video
+        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
 
         toast({
           title: 'Success',
@@ -485,8 +467,16 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
             const url = await uploadFile(file, 'video');
             const editor = quill.getEditor();
             const selection = editor.getSelection(true) as RangeStatic;
-            editor.insertEmbed(selection.index, 'video', url, 'user');
-            editor.setSelection(selection.index + 1, 0);
+
+            // Insert newline before video
+            editor.insertText(selection.index, '\n', 'user');
+
+            // Insert video embed
+            editor.insertEmbed(selection.index + 1, 'video', url, 'user');
+
+            // Move cursor after video
+            editor.setSelection(selection.index + 2, 0, 'silent');
+
             toast({
               title: 'Success',
               description: 'Video uploaded successfully',
@@ -529,8 +519,16 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
       try {
         const editor = quill.getEditor();
         const selection = editor.getSelection(true) as RangeStatic;
-        editor.insertEmbed(selection.index, 'embed', { url });
-        editor.setSelection(selection.index + 1, 0);
+
+        // Insert newline before embed
+        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+
+        // Insert embed
+        editor.insertEmbed(selection.index + 1, 'embed', { url });
+
+        // Move cursor after embed
+        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
+
         toast({
           title: 'Success',
           description: 'Content embedded successfully',

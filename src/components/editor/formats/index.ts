@@ -4,24 +4,48 @@ let formatsRegistered = false;
 
 // Register all formats
 async function registerFormats() {
-  if (formatsRegistered) return;
-  if (typeof window === 'undefined') return; // Skip registration on server-side
+  if (formatsRegistered) {
+    console.log('Formats already registered');
+    return;
+  }
+  if (typeof window === 'undefined') {
+    console.log('Skipping format registration on server-side');
+    return;
+  }
 
   try {
+    console.log('Starting format registration...');
     const { default: Quill } = await import('quill');
 
-    const BoldBlot = (await import('./boldBlot')).default;
-    const ItalicBlot = (await import('./italicBlot')).default;
-    const LinkBlot = (await import('./linkBlot')).default;
-    const BlockquoteBlot = (await import('./blockquoteBlot')).default;
-    const HeaderBlot = (await import('./headerBlot')).default;
-    const DividerBlot = (await import('./dividerBlot')).default;
-    const ImageBlot = (await import('./imageBlot')).default;
-    const VideoBlot = (await import('./videoBlot')).default;
-    const AudioBlot = (await import('./audioBlot')).default;
-    const EmbedBlot = (await import('./embedBlot')).default;
+    // Import all blots
+    const imports = await Promise.all([
+      import('./boldBlot'),
+      import('./italicBlot'),
+      import('./linkBlot'),
+      import('./blockquoteBlot'),
+      import('./headerBlot'),
+      import('./dividerBlot'),
+      import('./imageBlot'),
+      import('./videoBlot'),
+      import('./audioBlot'),
+      import('./embedBlot'),
+    ]);
 
-    Quill.register({
+    const [
+      BoldBlot,
+      ItalicBlot,
+      LinkBlot,
+      BlockquoteBlot,
+      HeaderBlot,
+      DividerBlot,
+      ImageBlot,
+      VideoBlot,
+      AudioBlot,
+      EmbedBlot,
+    ] = imports.map((module) => module.default);
+
+    // Verify each blot before registration
+    const blots = {
       'formats/bold': BoldBlot,
       'formats/italic': ItalicBlot,
       'formats/link': LinkBlot,
@@ -32,10 +56,36 @@ async function registerFormats() {
       'formats/video': VideoBlot,
       'formats/audio': AudioBlot,
       'formats/embed': EmbedBlot,
+    };
+
+    // Verify each blot has required static properties
+    Object.entries(blots).forEach(([name, blot]) => {
+      if (!blot.blotName || !blot.tagName) {
+        throw new Error(`Invalid blot configuration for ${name}`);
+      }
     });
+
+    // Register all blots
+    Quill.register(blots);
     formatsRegistered = true;
+
+    // Verify registration by checking if blots can be imported
+    const verifyFormats = Object.keys(blots)
+      .map((format) => {
+        try {
+          const blot = Quill.import(format);
+          return blot ? format : null;
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    console.log('Successfully registered formats:', verifyFormats);
   } catch (error) {
     console.error('Error registering Quill formats:', error);
+    formatsRegistered = false;
+    throw error; // Re-throw to handle in component
   }
 }
 

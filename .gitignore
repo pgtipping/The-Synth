@@ -32,7 +32,7 @@
 .md
 /public/*
 /docs/*
-
+*.mjs
 
 # debug
 npm-debug.log*
