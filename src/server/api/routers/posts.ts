@@ -13,13 +13,15 @@ const postInput = z.object({
     .string()
     .min(1, 'Content is required')
     .max(5000000, 'Content is too large'),
+  categoryIds: z.array(z.string()).optional(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 export const postsRouter = createTRPCRouter({
   createDraft: protectedProcedure
     .input(postInput)
     .mutation(async ({ ctx, input }) => {
-      const { title, content } = input;
+      const { title, content, categoryIds = [], tagIds = [] } = input;
 
       // Generate a unique slug from the title
       const baseSlug = slugify(title, { lower: true, strict: true });
@@ -39,6 +41,16 @@ export const postsRouter = createTRPCRouter({
           slug,
           published: false,
           authorId: ctx.session.user.id,
+          categories: {
+            connect: categoryIds.map((id) => ({ id })),
+          },
+          tags: {
+            connect: tagIds.map((id) => ({ id })),
+          },
+        },
+        include: {
+          categories: true,
+          tags: true,
         },
       });
 
@@ -49,133 +61,155 @@ export const postsRouter = createTRPCRouter({
       };
     }),
 
-  publish: protectedProcedure
+  updateDraft: protectedProcedure
     .input(
       z.object({
-        id: z.string().optional(),
-        title: z.string().min(1, 'Title is required'),
-        content: z.string().min(1, 'Content is required'),
+        id: z.string(),
+        ...postInput.shape,
       })
     )
     .mutation(async ({ ctx, input }) => {
-      try {
-        const { id, title, content } = input;
+      const { id, title, content, categoryIds = [], tagIds = [] } = input;
 
-        // Validate session and user
-        if (!ctx.session?.user?.id) {
-          console.error('No user in session');
-          throw new TRPCError({
-            code: 'UNAUTHORIZED',
-            message: 'You must be logged in to publish',
-          });
-        }
+      const post = await ctx.db.post.findUnique({
+        where: { id },
+        include: {
+          categories: true,
+          tags: true,
+        },
+      });
 
-        // Verify user exists
-        const user = await ctx.db.user.findUnique({
-          where: { id: ctx.session.user.id },
-          select: { id: true },
-        });
-
-        if (!user) {
-          console.error('User not found:', ctx.session.user.id);
-          throw new TRPCError({
-            code: 'UNAUTHORIZED',
-            message: 'User not found',
-          });
-        }
-
-        console.log('Publishing post:', {
-          id,
-          titleLength: title.length,
-          contentLength: content.length,
-          userId: ctx.session.user.id,
-        });
-
-        if (id) {
-          // Update existing post
-          const post = await ctx.db.post.findUnique({
-            where: { id },
-            select: { authorId: true },
-          });
-
-          if (!post) {
-            console.error('Post not found:', id);
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: 'Post not found',
-            });
-          }
-
-          if (post.authorId !== ctx.session.user.id) {
-            console.error('Unauthorized publish attempt:', {
-              postAuthor: post.authorId,
-              currentUser: ctx.session.user.id,
-            });
-            throw new TRPCError({
-              code: 'FORBIDDEN',
-              message: 'Not authorized to edit this post',
-            });
-          }
-
-          const updatedPost = await ctx.db.post.update({
-            where: { id },
-            data: {
-              title,
-              content,
-              published: true,
-              updatedAt: new Date(),
-            },
-          });
-
-          console.log('Post updated and published successfully:', id);
-
-          return {
-            status: 200,
-            message: 'Post published successfully',
-            data: updatedPost,
-          };
-        } else {
-          // Create new published post
-          const baseSlug = slugify(title, { lower: true, strict: true });
-          let slug = baseSlug;
-          let counter = 1;
-
-          while (await ctx.db.post.findUnique({ where: { slug } })) {
-            slug = `${baseSlug}-${counter}`;
-            counter++;
-          }
-
-          console.log('Creating new published post with slug:', slug);
-
-          const post = await ctx.db.post.create({
-            data: {
-              title,
-              content,
-              slug,
-              published: true,
-              authorId: ctx.session.user.id,
-            },
-          });
-
-          console.log('New post created and published successfully:', post.id);
-
-          return {
-            status: 201,
-            message: 'Post published successfully',
-            data: post,
-          };
-        }
-      } catch (error) {
-        console.error('Error publishing post:', error);
-        if (error instanceof TRPCError) {
-          throw error;
-        }
+      if (!post) {
         throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to publish post',
-          cause: error,
+          code: 'NOT_FOUND',
+          message: 'Post not found',
         });
       }
+
+      if (post.authorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only edit your own posts',
+        });
+      }
+
+      // Generate new slug if title is changed
+      let slug = post.slug;
+      if (title !== post.title) {
+        const baseSlug = slugify(title, { lower: true, strict: true });
+        slug = baseSlug;
+        let counter = 1;
+
+        while (
+          await ctx.db.post.findFirst({
+            where: { slug, id: { not: id } },
+          })
+        ) {
+          slug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+
+      const updatedPost = await ctx.db.post.update({
+        where: { id },
+        data: {
+          title,
+          content,
+          slug,
+          categories: {
+            set: categoryIds.map((id) => ({ id })),
+          },
+          tags: {
+            set: tagIds.map((id) => ({ id })),
+          },
+        },
+        include: {
+          categories: true,
+          tags: true,
+        },
+      });
+
+      return {
+        status: 200,
+        message: 'Post updated successfully',
+        data: updatedPost,
+      };
+    }),
+
+  publishPost: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        ...postInput.shape,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const { id, title, content, categoryIds = [], tagIds = [] } = input;
+
+      const post = await ctx.db.post.findUnique({
+        where: { id },
+        include: {
+          categories: true,
+          tags: true,
+        },
+      });
+
+      if (!post) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Post not found',
+        });
+      }
+
+      if (post.authorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only publish your own posts',
+        });
+      }
+
+      // Generate new slug if title is changed
+      let slug = post.slug;
+      if (title !== post.title) {
+        const baseSlug = slugify(title, { lower: true, strict: true });
+        slug = baseSlug;
+        let counter = 1;
+
+        while (
+          await ctx.db.post.findFirst({
+            where: { slug, id: { not: id } },
+          })
+        ) {
+          slug = `${baseSlug}-${counter}`;
+          counter++;
+        }
+      }
+
+      const publishedPost = await ctx.db.post.update({
+        where: { id },
+        data: {
+          title,
+          content,
+          slug,
+          published: true,
+          categories: {
+            set: categoryIds.map((id) => ({ id })),
+          },
+          tags: {
+            set: tagIds.map((id) => ({ id })),
+          },
+        },
+        include: {
+          categories: true,
+          tags: true,
+        },
+      });
+
+      return {
+        status: 200,
+        message: 'Post published successfully',
+        data: publishedPost,
+      };
     }),
 
   getPostById: publicProcedure
@@ -190,234 +224,40 @@ export const postsRouter = createTRPCRouter({
               image: true,
             },
           },
+          categories: true,
+          tags: true,
         },
       });
 
       if (!post) {
-        throw new Error('Post not found');
-      }
-
-      // Transform any S3 signed URLs to direct URLs in the content
-      if (post.content) {
-        post.content = post.content.replace(
-          /https:\/\/[^"']*?amazonaws\.com\/[^"']*/g,
-          (url) => {
-            // Extract the key from the URL (everything after the bucket name)
-            const key = url.split('.amazonaws.com/')[1]?.split('?')[0];
-            if (key) {
-              // Return the direct URL
-              return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-            }
-            return url;
-          }
-        );
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Post not found',
+        });
       }
 
       return post;
     }),
 
   getDrafts: protectedProcedure
-    .input(
-      z.object({
-        limit: z.number().min(1).max(100).optional().default(10),
-        cursor: z.string().optional(),
-        orderBy: z
-          .enum(['createdAt', 'updatedAt', 'title'])
-          .optional()
-          .default('updatedAt'),
-        orderDir: z.enum(['asc', 'desc']).optional().default('desc'),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const { limit, cursor, orderBy, orderDir } = input;
-
+    .input(z.object({}).optional())
+    .query(async ({ ctx }) => {
       const drafts = await ctx.db.post.findMany({
         where: {
           authorId: ctx.session.user.id,
           published: false,
         },
-        take: limit + 1,
-        cursor: cursor ? { id: cursor } : undefined,
-        orderBy: { [orderBy]: orderDir },
+        orderBy: {
+          updatedAt: 'desc',
+        },
         include: {
-          author: {
-            select: {
-              name: true,
-              image: true,
-            },
-          },
+          categories: true,
+          tags: true,
         },
       });
-
-      let nextCursor: typeof cursor | undefined = undefined;
-      if (drafts.length > limit) {
-        const nextItem = drafts.pop();
-        nextCursor = nextItem!.id;
-      }
 
       return {
         items: drafts,
-        nextCursor,
-      };
-    }),
-
-  updateDraft: protectedProcedure
-    .input(
-      z.object({
-        id: z.string(),
-        title: z.string().min(1, 'Title is required'),
-        content: z
-          .string()
-          .min(1, 'Content is required')
-          .max(5000000, 'Content is too large'),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const { id, title, content } = input;
-
-        console.log('Updating draft with:', {
-          id,
-          titleLength: title.length,
-          contentLength: content.length,
-        });
-
-        const post = await ctx.db.post.findUnique({
-          where: { id },
-          select: { authorId: true, published: true },
-        });
-
-        if (!post) {
-          console.error('Post not found:', id);
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: 'Post not found',
-          });
-        }
-
-        if (post.authorId !== ctx.session.user.id) {
-          console.error('Unauthorized edit attempt:', {
-            postAuthor: post.authorId,
-            currentUser: ctx.session.user.id,
-          });
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Not authorized to edit this post',
-          });
-        }
-
-        const updatedDraft = await ctx.db.post.update({
-          where: { id },
-          data: {
-            title,
-            content,
-            published: false,
-            updatedAt: new Date(),
-          },
-        });
-
-        console.log('Post converted to draft and updated successfully:', id);
-
-        return {
-          status: 200,
-          message: post.published
-            ? 'Published post converted to draft and updated'
-            : 'Draft updated successfully',
-          data: updatedDraft,
-        };
-      } catch (error) {
-        console.error('Error updating post:', error);
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to update post',
-          cause: error,
-        });
-      }
-    }),
-
-  deleteDraft: protectedProcedure
-    .input(z.object({ id: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      const post = await ctx.db.post.findUnique({
-        where: { id: input.id },
-        select: { authorId: true, published: true },
-      });
-
-      if (!post) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Draft not found',
-        });
-      }
-
-      if (post.authorId !== ctx.session.user.id) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Not authorized to delete this draft',
-        });
-      }
-
-      if (post.published) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot delete a published post as draft',
-        });
-      }
-
-      await ctx.db.post.delete({
-        where: { id: input.id },
-      });
-
-      return {
-        status: 200,
-        message: 'Draft deleted successfully',
-      };
-    }),
-
-  getPublishedPosts: publicProcedure
-    .input(
-      z.object({
-        limit: z.number().min(1).max(100).optional().default(10),
-        cursor: z.string().optional(),
-        orderBy: z
-          .enum(['createdAt', 'updatedAt', 'title'])
-          .optional()
-          .default('createdAt'),
-        orderDir: z.enum(['asc', 'desc']).optional().default('desc'),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const { limit, cursor, orderBy, orderDir } = input;
-
-      const posts = await ctx.db.post.findMany({
-        where: {
-          published: true,
-        },
-        take: limit + 1,
-        cursor: cursor ? { id: cursor } : undefined,
-        orderBy: { [orderBy]: orderDir },
-        include: {
-          author: {
-            select: {
-              name: true,
-              image: true,
-            },
-          },
-        },
-      });
-
-      let nextCursor: typeof cursor | undefined = undefined;
-      if (posts.length > limit) {
-        const nextItem = posts.pop();
-        nextCursor = nextItem!.id;
-      }
-
-      return {
-        items: posts,
-        nextCursor,
       };
     }),
 
@@ -444,7 +284,7 @@ export const postsRouter = createTRPCRouter({
       if (post.authorId !== ctx.session.user.id) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Not authorized to modify this post',
+          message: 'You can only modify your own posts',
         });
       }
 
@@ -462,6 +302,45 @@ export const postsRouter = createTRPCRouter({
           ? 'Post published successfully'
           : 'Post unpublished successfully',
         data: updatedPost,
+      };
+    }),
+
+  deleteDraft: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const post = await ctx.db.post.findUnique({
+        where: { id: input.id },
+        select: { authorId: true, published: true },
+      });
+
+      if (!post) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Draft not found',
+        });
+      }
+
+      if (post.authorId !== ctx.session.user.id) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You can only delete your own drafts',
+        });
+      }
+
+      if (post.published) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot delete a published post as draft',
+        });
+      }
+
+      await ctx.db.post.delete({
+        where: { id: input.id },
+      });
+
+      return {
+        status: 200,
+        message: 'Draft deleted successfully',
       };
     }),
 });

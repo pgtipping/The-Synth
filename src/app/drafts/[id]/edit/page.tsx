@@ -10,6 +10,8 @@ import dynamic from 'next/dynamic';
 import { trpc } from '@/lib/trpc';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
+import { TRPCClientErrorLike } from '@trpc/client';
+import { type AppRouter } from '@/server/api/root';
 
 const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
   ssr: false,
@@ -58,21 +60,45 @@ export default function EditPost({ params }: { params: { id: string } }) {
     },
   });
 
-  const publish = trpc.posts.publish.useMutation({
-    onSuccess: (result) => {
+  const togglePublish = trpc.posts.togglePublish.useMutation({
+    onSuccess: (data) => {
       toast({
         title: 'Success',
-        description: 'Post published successfully',
+        description: data.message,
       });
-      router.push(`/blog/${result.data.id}`);
+      router.push(`/blog/${data.data.id}`);
     },
-    onError: () => {
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
       toast({
         title: 'Error',
-        description: 'Failed to publish. Please try again.',
+        description: error.message || 'Failed to publish. Please try again.',
+        variant: 'destructive',
       });
     },
   });
+
+  const handlePublish = async () => {
+    if (!title || !content) {
+      toast({
+        title: 'Missing Fields',
+        description: 'Please enter a title and content',
+      });
+      return;
+    }
+
+    // First save any changes
+    await updateDraft.mutateAsync({
+      id: params.id,
+      title,
+      content,
+    });
+
+    // Then publish the post
+    togglePublish.mutate({
+      id: params.id,
+      published: true,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -125,22 +151,6 @@ export default function EditPost({ params }: { params: { id: string } }) {
     });
   };
 
-  const handlePublish = async () => {
-    if (!title || !content) {
-      toast({
-        title: 'Missing Fields',
-        description: 'Please enter a title and content',
-      });
-      return;
-    }
-
-    publish.mutate({
-      id: params.id,
-      title,
-      content,
-    });
-  };
-
   return (
     <MainLayout>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
@@ -157,8 +167,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
             >
               {updateDraft.isPending ? 'Saving...' : 'Save'}
             </Button>
-            <Button onClick={handlePublish} disabled={publish.isPending}>
-              {publish.isPending ? 'Publishing...' : 'Publish'}
+            <Button onClick={handlePublish} disabled={togglePublish.isPending}>
+              {togglePublish.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           </div>
         </div>

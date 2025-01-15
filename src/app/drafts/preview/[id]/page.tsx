@@ -18,6 +18,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { TRPCClientErrorLike } from '@trpc/client';
+import { type AppRouter } from '@/server/api/root';
 
 export default function PreviewPost({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -28,35 +30,27 @@ export default function PreviewPost({ params }: { params: { id: string } }) {
     error,
   } = trpc.posts.getPostById.useQuery({ id: params.id });
 
-  const publish = trpc.posts.publish.useMutation({
-    onSuccess: (result) => {
+  const togglePublish = trpc.posts.togglePublish.useMutation({
+    onSuccess: (data) => {
       toast({
         title: 'Success',
-        description: 'Post published successfully',
+        description: data.message,
       });
-      router.push(`/blog/${result.data.id}`);
+      router.push(`/blog/${data.data.id}`);
     },
-    onError: () => {
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
       toast({
         title: 'Error',
-        description: 'Failed to publish. Please try again.',
+        description: error.message || 'Failed to publish. Please try again.',
+        variant: 'destructive',
       });
     },
   });
 
-  const handlePublish = async () => {
-    if (!post?.title || !post?.content) {
-      toast({
-        title: 'Missing Fields',
-        description: 'Post must have a title and content',
-      });
-      return;
-    }
-
-    publish.mutate({
+  const handlePublish = () => {
+    togglePublish.mutate({
       id: params.id,
-      title: post.title,
-      content: post.content,
+      published: true,
     });
   };
 
@@ -110,8 +104,8 @@ export default function PreviewPost({ params }: { params: { id: string } }) {
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button disabled={publish.isPending}>
-                  {publish.isPending ? 'Publishing...' : 'Publish'}
+                <Button disabled={togglePublish.isPending}>
+                  {togglePublish.isPending ? 'Publishing...' : 'Publish'}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>

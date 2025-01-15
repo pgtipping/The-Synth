@@ -11,6 +11,8 @@ import { trpc } from '@/lib/trpc';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
+import { type RouterOutputs, type AppRouter } from '@/server/api/root';
+import { type TRPCClientErrorLike } from '@trpc/client';
 
 export default function CreatePost() {
   const router = useRouter();
@@ -20,7 +22,7 @@ export default function CreatePost() {
   const [showPreview, setShowPreview] = useState(false);
 
   const createDraft = trpc.posts.createDraft.useMutation({
-    onSuccess: (result) => {
+    onSuccess: (result: RouterOutputs['posts']['createDraft']) => {
       toast({
         title: 'Success',
         description: 'Draft saved successfully',
@@ -35,15 +37,15 @@ export default function CreatePost() {
     },
   });
 
-  const publish = trpc.posts.publish.useMutation({
-    onSuccess: (result) => {
+  const togglePublish = trpc.posts.togglePublish.useMutation({
+    onSuccess: (result: RouterOutputs['posts']['togglePublish']) => {
       toast({
         title: 'Success',
         description: 'Post published successfully',
       });
       router.push(`/blog/${result.data.id}`);
     },
-    onError: (error) => {
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
       console.error('Publish error:', error);
       toast({
         title: 'Error',
@@ -88,9 +90,16 @@ export default function CreatePost() {
         .replace(/data:/gi, '')
         .replace(/vbscript:/gi, '');
 
-      publish.mutate({
+      // First create the draft
+      const result = await createDraft.mutateAsync({
         title,
         content: sanitizedContent,
+      });
+
+      // Then publish it
+      togglePublish.mutate({
+        id: result.data.id,
+        published: true,
       });
     } catch (error) {
       console.error('Error in handlePublish:', error);
@@ -160,8 +169,8 @@ export default function CreatePost() {
             >
               {createDraft.isPending ? 'Saving...' : 'Save Draft'}
             </Button>
-            <Button onClick={handlePublish} disabled={publish.isPending}>
-              {publish.isPending ? 'Publishing...' : 'Publish'}
+            <Button onClick={handlePublish} disabled={togglePublish.isPending}>
+              {togglePublish.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           </div>
         </div>

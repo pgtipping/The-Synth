@@ -10,6 +10,9 @@ import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { type RouterOutputs } from '@/server/api/root';
+import { type TRPCClientErrorLike } from '@trpc/client';
+import { type AppRouter } from '@/server/api/root';
 
 const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
   ssr: false,
@@ -55,18 +58,19 @@ export default function EditPost({ params }: { params: { id: string } }) {
     },
   });
 
-  const publish = trpc.posts.publish.useMutation({
-    onSuccess: (result) => {
+  const togglePublish = trpc.posts.togglePublish.useMutation({
+    onSuccess: (data) => {
       toast({
         title: 'Success',
-        description: 'Post published successfully',
+        description: data.message,
       });
-      router.push(`/blog/${result.data.id}`);
+      router.push(`/blog/${data.data.id}`);
     },
-    onError: () => {
+    onError: (error: TRPCClientErrorLike<AppRouter>) => {
       toast({
         title: 'Error',
-        description: 'Failed to publish. Please try again.',
+        description: error.message || 'Failed to publish. Please try again.',
+        variant: 'destructive',
       });
     },
   });
@@ -131,10 +135,17 @@ export default function EditPost({ params }: { params: { id: string } }) {
       return;
     }
 
-    publish.mutate({
+    // First save any changes
+    await updateDraft.mutateAsync({
       id: params.id,
       title,
       content,
+    });
+
+    // Then publish the post
+    togglePublish.mutate({
+      id: params.id,
+      published: true,
     });
   };
 
@@ -154,8 +165,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
             >
               {updateDraft.isPending ? 'Saving...' : 'Save'}
             </Button>
-            <Button onClick={handlePublish} disabled={publish.isPending}>
-              {publish.isPending ? 'Publishing...' : 'Publish'}
+            <Button onClick={handlePublish} disabled={togglePublish.isPending}>
+              {togglePublish.isPending ? 'Publishing...' : 'Publish'}
             </Button>
           </div>
         </div>

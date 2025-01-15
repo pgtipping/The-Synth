@@ -2,7 +2,7 @@
 
 import ReactQuill from 'react-quill';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { Icons } from '../icons';
 import {
   Bold,
@@ -16,6 +16,7 @@ import {
   Underline,
   Strikethrough,
 } from 'lucide-react';
+import styles from './FloatingToolbar.module.css';
 
 // Add the new icons to the Icons object
 const EditorIcons = {
@@ -158,12 +159,10 @@ export function FloatingToolbar({
   return (
     <div
       ref={toolbarRef}
-      className="floating-toolbar absolute z-[9999] flex items-center gap-1 rounded-lg border bg-white p-1 shadow-lg"
+      className={styles.toolbar}
       style={{
-        top: `${position.top}px`,
-        left: `${position.left}px`,
-        transform: 'translateX(-50%)',
-        whiteSpace: 'nowrap',
+        top: position.top + 'px',
+        left: position.left + 'px',
       }}
     >
       <Button
