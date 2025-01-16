@@ -3,6 +3,7 @@ import { authRouter } from '@/server/api/routers/auth';
 import { postsRouter } from './routers/posts';
 import { categoryRouter } from './routers/category';
 import { tagRouter } from './routers/tag';
+import { imageRouter } from './routers/image';
 import { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 
 export const appRouter = createTRPCRouter({
@@ -10,6 +11,7 @@ export const appRouter = createTRPCRouter({
   posts: postsRouter,
   categories: categoryRouter,
   tags: tagRouter,
+  image: imageRouter,
 });
 
 export type AppRouter = typeof appRouter;
