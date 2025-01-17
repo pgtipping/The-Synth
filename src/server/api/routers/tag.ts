@@ -15,6 +15,10 @@ const tagIdSchema = z.object({
   id: z.string(),
 });
 
+const tagSlugSchema = z.object({
+  slug: z.string(),
+});
+
 export const tagRouter = createTRPCRouter({
   // Create a new tag
   create: protectedProcedure
@@ -199,5 +203,39 @@ export const tagRouter = createTRPCRouter({
         status: 200,
         message: 'Tag deleted successfully',
       };
+    }),
+
+  // Get a single tag by slug
+  getBySlug: publicProcedure
+    .input(tagSlugSchema)
+    .query(async ({ ctx, input }) => {
+      const tag = await ctx.db.tag.findUnique({
+        where: { slug: input.slug },
+        include: {
+          posts: {
+            where: { published: true },
+            orderBy: { createdAt: 'desc' },
+            include: {
+              author: {
+                select: {
+                  name: true,
+                  image: true,
+                },
+              },
+              categories: true,
+              tags: true,
+            },
+          },
+        },
+      });
+
+      if (!tag) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Tag not found',
+        });
+      }
+
+      return tag;
     }),
 });

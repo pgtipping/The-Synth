@@ -113,7 +113,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                         {post.categories.map((category) => (
                           <Link
                             key={category.id}
-                            href={`/categories/${category.slug}`}
+                            href={`/blog/category/${category.slug}`}
                             className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
                           >
                             {category.name}
@@ -122,8 +122,8 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                         {post.tags.map((tag) => (
                           <Link
                             key={tag.id}
-                            href={`/tags/${tag.slug}`}
-                            className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                            href={`/blog/tag/${tag.slug}`}
+                            className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                           >
                             #{tag.name}
                           </Link>
