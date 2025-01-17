@@ -6,13 +6,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeftIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import Link from 'next/link';
-import QuillEditor from '@/components/editor/QuillEditor';
+import dynamic from 'next/dynamic';
 import { trpc } from '@/lib/trpc';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
 import { type RouterOutputs, type AppRouter } from '@/server/api/root';
 import { type TRPCClientErrorLike } from '@trpc/client';
+import { CategoryList } from '@/components/category/CategoryList';
+import { TagList } from '@/components/tag/TagList';
+
+const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
+  ssr: false,
+});
 
 export default function CreatePost() {
   const router = useRouter();
@@ -20,6 +26,8 @@ export default function CreatePost() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   const createDraft = trpc.posts.createDraft.useMutation({
     onSuccess: (result: RouterOutputs['posts']['createDraft']) => {
@@ -67,6 +75,8 @@ export default function CreatePost() {
     createDraft.mutate({
       title,
       content,
+      categoryIds: selectedCategoryIds,
+      tagIds: selectedTagIds,
     });
   };
 
@@ -94,6 +104,8 @@ export default function CreatePost() {
       const result = await createDraft.mutateAsync({
         title,
         content: sanitizedContent,
+        categoryIds: selectedCategoryIds,
+        tagIds: selectedTagIds,
       });
 
       // Then publish it
@@ -195,6 +207,29 @@ export default function CreatePost() {
                 value={content}
                 onChange={setContent}
                 placeholder="Write your blog post..."
+              />
+            </div>
+
+            <div className="space-y-6">
+              <CategoryList
+                selectedIds={selectedCategoryIds}
+                onSelect={(id: string) =>
+                  setSelectedCategoryIds([...selectedCategoryIds, id])
+                }
+                onDeselect={(id: string) =>
+                  setSelectedCategoryIds(
+                    selectedCategoryIds.filter((cid) => cid !== id)
+                  )
+                }
+              />
+              <TagList
+                selectedIds={selectedTagIds}
+                onSelect={(id: string) =>
+                  setSelectedTagIds([...selectedTagIds, id])
+                }
+                onDeselect={(id: string) =>
+                  setSelectedTagIds(selectedTagIds.filter((tid) => tid !== id))
+                }
               />
             </div>
           </div>

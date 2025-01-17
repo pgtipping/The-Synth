@@ -294,6 +294,10 @@ export const postsRouter = createTRPCRouter({
           published: input.published,
           updatedAt: new Date(),
         },
+        include: {
+          categories: true,
+          tags: true,
+        },
       });
 
       return {

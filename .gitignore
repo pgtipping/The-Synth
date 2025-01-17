@@ -26,13 +26,13 @@
 *.json
 .env.sentry-build-plugin
 *.log
+*.mjs
 .cursorrules
 .cursorignore
 /.notes/*
 .md
 /public/*
 /docs/*
-*.mjs
 
 # debug
 npm-debug.log*

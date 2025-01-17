@@ -13,6 +13,8 @@ import { useEffect, useState } from 'react';
 import { type RouterOutputs } from '@/server/api/root';
 import { type TRPCClientErrorLike } from '@trpc/client';
 import { type AppRouter } from '@/server/api/root';
+import { CategoryList } from '@/components/category/CategoryList';
+import { TagList } from '@/components/tag/TagList';
 
 const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
   ssr: false,
@@ -24,6 +26,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isInitialized, setIsInitialized] = useState(false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
 
   const {
     data: post,
@@ -36,6 +40,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
     if (post && !isInitialized) {
       setTitle(post.title);
       setContent(post.content);
+      setSelectedCategoryIds(post.categories.map((c) => c.id));
+      setSelectedTagIds(post.tags.map((t) => t.id));
       setIsInitialized(true);
     }
   }, [post, isInitialized]);
@@ -123,6 +129,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
       id: params.id,
       title,
       content: sanitizedContent,
+      categoryIds: selectedCategoryIds,
+      tagIds: selectedTagIds,
     });
   };
 
@@ -140,6 +148,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
       id: params.id,
       title,
       content,
+      categoryIds: selectedCategoryIds,
+      tagIds: selectedTagIds,
     });
 
     // Then publish the post
@@ -185,6 +195,29 @@ export default function EditPost({ params }: { params: { id: string } }) {
               value={content}
               onChange={setContent}
               placeholder="Write your blog post..."
+            />
+          </div>
+
+          <div className="space-y-6">
+            <CategoryList
+              selectedIds={selectedCategoryIds}
+              onSelect={(id: string) =>
+                setSelectedCategoryIds([...selectedCategoryIds, id])
+              }
+              onDeselect={(id: string) =>
+                setSelectedCategoryIds(
+                  selectedCategoryIds.filter((cid) => cid !== id)
+                )
+              }
+            />
+            <TagList
+              selectedIds={selectedTagIds}
+              onSelect={(id: string) =>
+                setSelectedTagIds([...selectedTagIds, id])
+              }
+              onDeselect={(id: string) =>
+                setSelectedTagIds(selectedTagIds.filter((tid) => tid !== id))
+              }
             />
           </div>
         </div>

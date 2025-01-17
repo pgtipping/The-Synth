@@ -33,6 +33,8 @@ export default async function Home() {
           image: true,
         },
       },
+      categories: true,
+      tags: true,
     },
   });
 
@@ -65,6 +67,8 @@ export default async function Home() {
       author: post.author?.name || 'Anonymous',
       date: format(post.createdAt, 'MMM d, yyyy'),
       image: imageUrl,
+      categories: post.categories,
+      tags: post.tags,
       isReal: true as const,
     };
   });
@@ -74,6 +78,8 @@ export default async function Home() {
     ...transformedPosts,
     ...mockBlogs.map((blog: (typeof mockBlogs)[0]) => ({
       ...blog,
+      categories: [],
+      tags: [],
       isReal: false as const,
     })),
   ];

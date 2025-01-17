@@ -20,6 +20,23 @@ export default function BlogPost({ params }: { params: { id: string } }) {
     refetch,
   } = trpc.posts.getPostById.useQuery({ id: params.id });
 
+  // Debug logging
+  useEffect(() => {
+    if (post) {
+      console.log('Full post data:', JSON.stringify(post, null, 2));
+      console.log('Categories:', {
+        raw: post.categories,
+        mapped: post.categories.map((c) => ({ id: c.id, name: c.name })),
+        count: post.categories.length,
+      });
+      console.log('Tags:', {
+        raw: post.tags,
+        mapped: post.tags.map((t) => ({ id: t.id, name: t.name })),
+        count: post.tags.length,
+      });
+    }
+  }, [post]);
+
   // Handle errors in useEffect to prevent re-renders
   useEffect(() => {
     if (error) {
@@ -91,6 +108,28 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                         {post.published ? 'Published' : 'Draft'}
                       </span>
                     </div>
+                    {(post.categories.length > 0 || post.tags.length > 0) && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {post.categories.map((category) => (
+                          <Link
+                            key={category.id}
+                            href={`/categories/${category.slug}`}
+                            className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
+                          >
+                            {category.name}
+                          </Link>
+                        ))}
+                        {post.tags.map((tag) => (
+                          <Link
+                            key={tag.id}
+                            href={`/tags/${tag.slug}`}
+                            className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                          >
+                            #{tag.name}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 

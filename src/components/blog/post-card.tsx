@@ -10,7 +10,8 @@ interface Post {
   author: string;
   date: string;
   image?: string;
-  category?: string;
+  categories?: Array<{ id: string; name: string; slug: string }>;
+  tags?: Array<{ id: string; name: string; slug: string }>;
   isReal: boolean;
 }
 
@@ -39,9 +40,18 @@ export function PostCard({ post }: { post: Post }) {
         </div>
       )}
       <div className="p-4">
-        {!post.isReal && post.category && (
-          <div className="mb-2 text-sm font-medium text-muted-foreground">
-            {post.category}
+        {!post.isReal && post.categories && post.categories.length > 0 && (
+          <div className="mb-2 flex flex-wrap gap-2">
+            {post.categories.map((category) => (
+              <Link
+                key={category.id}
+                href={`/categories/${category.slug}`}
+                className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {category.name}
+              </Link>
+            ))}
           </div>
         )}
         <h2 className="mb-2 line-clamp-2 text-lg font-semibold group-hover:text-primary">
@@ -51,9 +61,26 @@ export function PostCard({ post }: { post: Post }) {
           className="mb-4 line-clamp-2 text-sm text-muted-foreground"
           dangerouslySetInnerHTML={{ __html: post.excerpt }}
         />
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>By {post.author}</span>
-          <span>{post.date}</span>
+        <div className="flex flex-wrap items-center justify-between gap-y-2">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>By {post.author}</span>
+            <span>•</span>
+            <span>{post.date}</span>
+          </div>
+          {post.tags && post.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {post.tags.map((tag) => (
+                <Link
+                  key={tag.id}
+                  href={`/tags/${tag.slug}`}
+                  className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  #{tag.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Link>

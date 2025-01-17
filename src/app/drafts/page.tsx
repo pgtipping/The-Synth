@@ -107,10 +107,40 @@ export default function DraftsPage() {
                   }}
                 />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">
-                    Last edited on{' '}
-                    {format(new Date(draft.updatedAt), 'MMM d, yyyy')}
-                  </span>
+                  <div className="flex flex-col gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      Last edited on{' '}
+                      {format(new Date(draft.updatedAt), 'MMM d, yyyy')}
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {draft.categories.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {draft.categories.map((category) => (
+                            <Link
+                              key={category.id}
+                              href={`/categories/${category.slug}`}
+                              className="inline-flex items-center rounded-full bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20"
+                            >
+                              {category.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                      {draft.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {draft.tags.map((tag) => (
+                            <Link
+                              key={tag.id}
+                              href={`/tags/${tag.slug}`}
+                              className="inline-flex items-center rounded-full bg-secondary/10 px-2 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/20"
+                            >
+                              #{tag.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
                     <Link href={`/drafts/${draft.id}/edit`}>
                       <Button variant="outline" size="sm">
