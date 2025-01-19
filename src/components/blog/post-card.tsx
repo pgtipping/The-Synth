@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 
 interface Post {
   id: string;
@@ -16,13 +17,16 @@ interface Post {
 }
 
 export function PostCard({ post }: { post: Post }) {
-  // Debug log
-  console.log('PostCard image URL:', post.image);
+  const router = useRouter();
+
+  const handleCardClick = () => {
+    router.push(`/blog/${post.id}`);
+  };
 
   return (
-    <Link
-      href={`/blog/${post.id}`}
-      className="group block overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md"
+    <div
+      onClick={handleCardClick}
+      className="group block cursor-pointer overflow-hidden rounded-lg border bg-card transition-all hover:shadow-md"
     >
       {post.image && (
         <div className="relative h-48 w-full overflow-hidden">
@@ -47,7 +51,9 @@ export function PostCard({ post }: { post: Post }) {
                 key={category.id}
                 href={`/blog/category/${category.slug}`}
                 className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary hover:bg-primary/20"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                }}
               >
                 {category.name}
               </Link>
@@ -74,7 +80,9 @@ export function PostCard({ post }: { post: Post }) {
                   key={tag.id}
                   href={`/blog/tag/${tag.slug}`}
                   className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
-                  onClick={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
                 >
                   #{tag.name}
                 </Link>
@@ -83,6 +91,6 @@ export function PostCard({ post }: { post: Post }) {
           )}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

@@ -66,3 +66,11 @@ node_modules/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Allow specific JSON files
+!package.json
+!prisma/schema.json
+!tsconfig.json
+
+# Database backups
+/backups/

@@ -34,6 +34,36 @@ export const postsRouter = createTRPCRouter({
         counter++;
       }
 
+      // First verify user exists
+      console.log('Attempting to find user with ID:', ctx.session.user.id);
+      const user = await ctx.db.user.findUnique({
+        where: { id: ctx.session.user.id },
+        select: { id: true, email: true },
+      });
+
+      console.log('User lookup result:', user);
+
+      if (!user) {
+        // Try to create user if doesn't exist
+        try {
+          const newUser = await ctx.db.user.create({
+            data: {
+              id: ctx.session.user.id,
+              email: ctx.session.user.email,
+            },
+          });
+          console.log('Created new user:', newUser);
+        } catch (error) {
+          console.error('Error creating user:', error);
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message:
+              'Failed to create user account. Please try logging out and in again.',
+            cause: error,
+          });
+        }
+      }
+
       const post = await ctx.db.post.create({
         data: {
           title,

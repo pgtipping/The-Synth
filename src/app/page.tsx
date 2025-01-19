@@ -8,6 +8,7 @@ import { truncateHTML } from '@/lib/utils';
 import { PostCard } from '@/components/blog/post-card';
 import { db } from '@/server/db';
 import { mockBlogs } from '@/lib/mock-data';
+import { HeroButtons } from '@/components/home/hero-buttons';
 
 const POSTS_PER_PAGE = 6;
 
@@ -103,19 +104,7 @@ export default async function Home() {
                   reach and inspire readers worldwide.
                 </p>
               </div>
-              <div className="flex items-center gap-4">
-                <Link href="/blog/new">
-                  <Button size="lg" className="gap-2">
-                    <PlusIcon className="h-5 w-5" />
-                    Start Writing
-                  </Button>
-                </Link>
-                <a href="#latest-posts">
-                  <Button variant="outline" size="lg">
-                    Explore Posts
-                  </Button>
-                </a>
-              </div>
+              <HeroButtons />
             </div>
             <div className="relative mx-auto max-w-lg lg:mx-0">
               <div className="absolute -inset-4 -z-10 rounded-xl bg-gradient-to-b from-primary/5 via-primary/10 to-transparent" />
@@ -139,7 +128,7 @@ export default async function Home() {
       >
         <div className="mb-8 flex items-center justify-between">
           <h2 className="text-3xl font-bold">Latest Posts</h2>
-          <Link href="/blog/new">
+          <Link href="/blog/new" className="inline-block">
             <Button>
               <PlusIcon className="mr-2 h-4 w-4" />
               Create New Post

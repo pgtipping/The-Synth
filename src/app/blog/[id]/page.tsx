@@ -64,8 +64,8 @@ export default function BlogPost({ params }: { params: { id: string } }) {
             <div className="rounded-lg bg-background p-8 text-center shadow-sm">
               <h1 className="text-2xl font-bold">Post not found</h1>
               <p className="mt-2 text-muted-foreground">
-                The post you're looking for doesn't exist or you don't have
-                permission to view it.
+                The post you&apos;re looking for doesn&apos;t exist or you
+                don&apos;t have permission to view it.
               </p>
             </div>
           ) : (
