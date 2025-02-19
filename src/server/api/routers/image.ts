@@ -17,7 +17,7 @@ export const imageRouter = createTRPCRouter({
         }),
       })
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input, _ctx }) => {
       try {
         // Validate mime type
         if (!input.file.type.startsWith('image/')) {

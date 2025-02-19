@@ -6,6 +6,7 @@ import {
   publicProcedure,
 } from '@/server/api/trpc';
 import slugify from 'slugify';
+import { logger } from '@/lib/logger';
 
 const postInput = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -35,13 +36,13 @@ export const postsRouter = createTRPCRouter({
       }
 
       // First verify user exists
-      console.log('Attempting to find user with ID:', ctx.session.user.id);
+      logger.info('Attempting to find user with ID:', ctx.session.user.id);
       const user = await ctx.db.user.findUnique({
         where: { id: ctx.session.user.id },
         select: { id: true, email: true },
       });
 
-      console.log('User lookup result:', user);
+      logger.info('User lookup result:', user);
 
       if (!user) {
         // Try to create user if doesn't exist
@@ -52,9 +53,9 @@ export const postsRouter = createTRPCRouter({
               email: ctx.session.user.email,
             },
           });
-          console.log('Created new user:', newUser);
+          logger.info('Created new user:', newUser);
         } catch (error) {
-          console.error('Error creating user:', error);
+          logger.error('Failed to create user:', error);
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message:

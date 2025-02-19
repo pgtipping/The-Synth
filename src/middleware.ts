@@ -1,15 +1,11 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { withAuth } from 'next-auth/middleware';
 
-export function middleware(request: NextRequest) {
-  // Redirect /blog/drafts to /drafts
-  if (request.nextUrl.pathname === '/blog/drafts') {
-    return NextResponse.redirect(new URL('/drafts', request.url));
-  }
-
-  return NextResponse.next();
-}
+export default withAuth({
+  callbacks: {
+    authorized: ({ token }) => !!token,
+  },
+});
 
 export const config = {
-  matcher: '/blog/drafts',
+  matcher: ['/blog/new', '/blog/:id/edit', '/drafts/:path*'],
 };

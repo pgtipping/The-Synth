@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { env } from '@/env.mjs';
 import crypto from 'crypto';
+import { TRPCError } from '@trpc/server';
 
 interface ImageSize {
   width: number;
@@ -22,10 +23,22 @@ const imageSizes: ImageSize[] = [
 ];
 
 export class ImageService {
-  private s3Client: S3Client;
-  private bucket: string;
+  private s3Client: S3Client | null = null;
+  private bucket: string | null = null;
 
-  constructor() {
+  private initializeS3() {
+    if (
+      !env.AWS_ACCESS_KEY_ID ||
+      !env.AWS_SECRET_ACCESS_KEY ||
+      !env.AWS_REGION ||
+      !env.AWS_BUCKET_NAME
+    ) {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'AWS credentials not configured',
+      });
+    }
+
     this.s3Client = new S3Client({
       region: env.AWS_REGION,
       credentials: {
@@ -34,6 +47,12 @@ export class ImageService {
       },
     });
     this.bucket = env.AWS_BUCKET_NAME;
+  }
+
+  private ensureS3Client() {
+    if (!this.s3Client || !this.bucket) {
+      this.initializeS3();
+    }
   }
 
   private generateHash(buffer: Buffer): string {
@@ -56,6 +75,15 @@ export class ImageService {
     key: string,
     contentType: string
   ): Promise<string> {
+    this.ensureS3Client();
+
+    if (!this.s3Client || !this.bucket) {
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'S3 client not initialized',
+      });
+    }
+
     const command = new PutObjectCommand({
       Bucket: this.bucket,
       Key: key,
