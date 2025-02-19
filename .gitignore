@@ -74,3 +74,8 @@ node_modules/
 
 # Database backups
 /backups/
+
+# Memory Bank
+/memory-bank/
+memory-bank/
+*.memory-bank
