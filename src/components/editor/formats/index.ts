@@ -1,20 +1,22 @@
 'use client';
 
+import { logger } from '@/lib/logger';
+
 let formatsRegistered = false;
 
 // Register all formats
 async function registerFormats() {
   if (formatsRegistered) {
-    console.log('Formats already registered');
+    logger.info('Formats already registered');
     return;
   }
   if (typeof window === 'undefined') {
-    console.log('Skipping format registration on server-side');
+    logger.info('Skipping format registration on server-side');
     return;
   }
 
   try {
-    console.log('Starting format registration...');
+    logger.info('Starting format registration...');
     const { default: Quill } = await import('quill');
 
     // Import all blots
@@ -81,9 +83,9 @@ async function registerFormats() {
       })
       .filter(Boolean);
 
-    console.log('Successfully registered formats:', verifyFormats);
+    logger.info('Successfully registered formats:', verifyFormats);
   } catch (error) {
-    console.error('Error registering Quill formats:', error);
+    logger.error('Failed to register format:', error);
     formatsRegistered = false;
     throw error; // Re-throw to handle in component
   }

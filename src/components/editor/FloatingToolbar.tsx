@@ -1,41 +1,41 @@
 'use client';
 
-import ReactQuill from 'react-quill';
+import * as React from 'react';
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Icons } from '../icons';
 import {
   Bold,
   Italic,
-  Link as LinkIcon,
-  Heading1,
-  Heading2,
-  Heading3,
-  Quote,
-  Code2,
   Underline,
-  Strikethrough,
+  Code2,
+  Quote,
+  LinkIcon,
+  Heading1 as H1Icon,
+  Heading2 as H2Icon,
+  Heading3 as H3Icon,
+  Strikethrough as StrikethroughIcon,
 } from 'lucide-react';
 import styles from './FloatingToolbar.module.css';
+import { toast } from '@/components/ui/use-toast';
+import type { QuillInstance, QuillRange } from './types';
 
 // Add the new icons to the Icons object
 const EditorIcons = {
-  ...Icons,
   bold: Bold,
   italic: Italic,
   link: LinkIcon,
-  h1: Heading1,
-  h2: Heading2,
-  h3: Heading3,
+  h1: H1Icon,
+  h2: H2Icon,
+  h3: H3Icon,
   quote: Quote,
   code: Code2,
   underline: Underline,
-  strikethrough: Strikethrough,
+  strikethrough: StrikethroughIcon,
 } as const;
 
 interface FloatingToolbarProps {
-  quill: ReactQuill;
-  selection: { index: number; length: number } | null;
+  selection: QuillRange | null;
+  quill: QuillInstance;
 }
 
 interface FormatState {
@@ -50,8 +50,8 @@ interface FormatState {
 }
 
 export function FloatingToolbar({
-  quill,
   selection,
+  quill,
 }: FloatingToolbarProps): JSX.Element | null {
   const [position, setPosition] = useState({ top: -1000, left: -1000 });
   const [isVisible, setIsVisible] = useState(false);
@@ -60,7 +60,7 @@ export function FloatingToolbar({
     bold: false,
     italic: false,
     link: false,
-    header: false,
+    header: 0,
     blockquote: false,
     'code-block': false,
     underline: false,
@@ -73,15 +73,26 @@ export function FloatingToolbar({
       return;
     }
 
-    const editor = quill.getEditor();
-    const bounds = editor.getBounds(selection.index, selection.length);
+    try {
+      const bounds = quill.getBounds(selection.index, selection.length);
+      if (!bounds) {
+        setIsVisible(false);
+        return;
+      }
 
-    // Simple positioning above selection, moved 100px to the right
-    setPosition({
-      top: bounds.top - 50,
-      left: bounds.left + bounds.width / 2 + 200,
-    });
-    setIsVisible(true);
+      setPosition({
+        top: bounds.top - 50,
+        left: bounds.left + bounds.width / 2 + 200,
+      });
+      setIsVisible(true);
+    } catch (error) {
+      toast({
+        title: 'Editor Error',
+        description: 'Failed to update toolbar position',
+        variant: 'destructive',
+      });
+      setIsVisible(false);
+    }
   }, [quill, selection]);
 
   const updateFormats = useCallback(() => {
@@ -90,7 +101,7 @@ export function FloatingToolbar({
         bold: false,
         italic: false,
         link: false,
-        header: false,
+        header: 0,
         blockquote: false,
         'code-block': false,
         underline: false,
@@ -99,19 +110,37 @@ export function FloatingToolbar({
       return;
     }
 
-    const editor = quill.getEditor();
-    const currentFormats = editor.getFormat(selection);
+    try {
+      const currentFormats = quill.getFormat(selection);
 
-    setFormats({
-      bold: Boolean(currentFormats.bold),
-      italic: Boolean(currentFormats.italic),
-      link: Boolean(currentFormats.link),
-      header: currentFormats.header || false,
-      blockquote: Boolean(currentFormats.blockquote),
-      'code-block': Boolean(currentFormats['code-block']),
-      underline: Boolean(currentFormats.underline),
-      strike: Boolean(currentFormats.strike),
-    });
+      setFormats({
+        bold: Boolean(currentFormats.bold),
+        italic: Boolean(currentFormats.italic),
+        link: Boolean(currentFormats.link),
+        header:
+          typeof currentFormats.header === 'number' ? currentFormats.header : 0,
+        blockquote: Boolean(currentFormats.blockquote),
+        'code-block': Boolean(currentFormats['code-block']),
+        underline: Boolean(currentFormats.underline),
+        strike: Boolean(currentFormats.strike),
+      });
+    } catch (error) {
+      toast({
+        title: 'Editor Error',
+        description: 'Failed to update formatting',
+        variant: 'destructive',
+      });
+      setFormats({
+        bold: false,
+        italic: false,
+        link: false,
+        header: 0,
+        blockquote: false,
+        'code-block': false,
+        underline: false,
+        strike: false,
+      });
+    }
   }, [quill, selection]);
 
   useEffect(() => {
@@ -126,21 +155,50 @@ export function FloatingToolbar({
   const toggleFormat = (format: keyof FormatState): void => {
     if (!quill || !selection) return;
 
-    const editor = quill.getEditor();
-    if (format === 'header') {
-      editor.format('header', false);
-    } else {
-      editor.format(format, !formats[format]);
+    try {
+      if (format === 'header') {
+        quill.removeFormat(selection.index, selection.length);
+      } else if (format === 'code-block') {
+        const value = !formats['code-block'];
+        quill.removeFormat(selection.index, selection.length);
+        quill.formatLine(
+          selection.index,
+          selection.length,
+          'code-block',
+          value
+        );
+      } else {
+        const value = !formats[format];
+        quill.formatText(selection.index, selection.length, format, value);
+      }
+      updateFormats();
+    } catch (error) {
+      console.error('Error toggling format:', error);
+      toast({
+        title: 'Editor Error',
+        description: 'Failed to update formatting',
+        variant: 'destructive',
+      });
     }
-    updateFormats();
   };
 
   const setHeader = (level: number): void => {
     if (!quill || !selection) return;
 
-    const editor = quill.getEditor();
-    editor.format('header', formats.header === level ? false : level);
-    updateFormats();
+    try {
+      quill.removeFormat(selection.index, selection.length);
+      if (level > 0) {
+        quill.formatLine(selection.index, selection.length, 'header', level);
+      }
+      updateFormats();
+    } catch (error) {
+      console.error('Error setting header:', error);
+      toast({
+        title: 'Editor Error',
+        description: 'Failed to update header formatting',
+        variant: 'destructive',
+      });
+    }
   };
 
   const insertLink = (): void => {
@@ -148,8 +206,7 @@ export function FloatingToolbar({
 
     const url = window.prompt('Enter URL:');
     if (url) {
-      const editor = quill.getEditor();
-      editor.format('link', url);
+      quill.format('link', url);
       updateFormats();
     }
   };

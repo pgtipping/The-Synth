@@ -1,21 +1,28 @@
 'use client';
 
-import ReactQuill from 'react-quill';
-import { useCallback, useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Button } from '../ui/button';
-import { Icons } from '../icons';
-import { Image, Video, Code, Link as LinkIcon, Plus } from 'lucide-react';
+import { Image, Video, Code2, Link as LinkIcon, Plus } from 'lucide-react';
 import { useToast } from '../ui/use-toast';
+import type { QuillInstance, QuillSource } from './types';
 
-// Define source type
-type QuillSource = 'user' | 'silent' | 'api';
+interface Position {
+  top: number;
+  left: number;
+}
+
+interface UploadResponse {
+  success: boolean;
+  url?: string;
+  error?: string;
+}
 
 // Add editor-specific icons
 const EditorIcons = {
-  ...Icons,
   image: Image,
   video: Video,
-  code: Code,
+  code: Code2,
   link: LinkIcon,
   plus: Plus,
 } as const;
@@ -33,33 +40,19 @@ const FILE_SIZE_LIMITS = {
 } as const;
 
 interface PlusMenuProps {
-  quill: ReactQuill;
-  onClose: () => void;
+  quill: QuillInstance;
+  onClose?: () => void;
 }
 
-interface Position {
-  top: number;
-  left: number;
-}
-
-interface RangeStatic {
-  index: number;
-  length: number;
-}
-
-interface UploadResponse {
-  success: boolean;
-  url: string;
-  key: string;
-  error?: string;
-}
-
-function formatFileSize(bytes: number): string {
+const formatFileSize = (bytes: number): string => {
   const mb = bytes / (1024 * 1024);
-  return `${mb.toFixed(1)}MB`;
-}
+  return `${mb}MB`;
+};
 
-export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
+export function PlusMenu({
+  quill,
+  onClose = () => {},
+}: PlusMenuProps): JSX.Element {
   const [position, setPosition] = useState<Position>({
     top: -1000,
     left: -1000,
@@ -68,86 +61,84 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
   const [isOpen, setIsOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const { toast } = useToast();
+  const editorRef = useRef<QuillInstance | null>(null);
+  const observerRef = useRef<MutationObserver | null>(null);
+  const mountedRef = useRef(true);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      // Cleanup observer if it exists
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
+    };
+  }, []);
+
+  // Keep a stable reference to the editor instance
+  useEffect(() => {
+    if (quill?.root && document.contains(quill.root)) {
+      editorRef.current = quill;
+    }
+  }, [quill]);
 
   useEffect(() => {
-    if (!quill) return;
+    if (!editorRef.current) {
+      setIsVisible(false);
+      return;
+    }
 
-    const editor = quill.getEditor();
+    const editor = editorRef.current;
 
-    const handleCursorChange = () => {
-      const selection = editor.getSelection();
-      if (!selection) {
+    // Simplified handler for cursor/text changes
+    const updateMenuVisibility = () => {
+      try {
+        const selection = editor.getSelection();
+        if (!selection) {
+          setIsVisible(false);
+          return;
+        }
+
+        // Get text content of current line
+        const [line] = editor.getLine(selection.index);
+        const lineContent = editor.getText(line.offset(), line.length());
+
+        // Simple rule: show menu if cursor is at start of empty line
+        const shouldShow =
+          selection.index === line.offset() && lineContent.trim() === '';
+
+        if (shouldShow) {
+          const bounds = editor.getBounds(selection.index, 0);
+          const editorBounds = editor.root.getBoundingClientRect();
+
+          setPosition({
+            top: bounds.top + editorBounds.top + window.scrollY,
+            left: editorBounds.left + 40,
+          });
+          setIsVisible(true);
+        } else {
+          setIsVisible(false);
+        }
+      } catch (error) {
+        console.error('PlusMenu: Update failed', error);
         setIsVisible(false);
-        return;
-      }
-
-      // Get the line information
-      const [line] = editor.getLine(selection.index);
-      if (!line) {
-        setIsVisible(false);
-        return;
-      }
-
-      // Get the line's content
-      const lineContent = editor.getText(line.offset(), line.length());
-
-      // Check if cursor is at the start of the line AND line is empty
-      const isAtLineStart = line.offset() === selection.index;
-      const isLineEmpty = lineContent.trim() === '';
-
-      if (!isAtLineStart || !isLineEmpty) {
-        setIsVisible(false);
-        return;
-      }
-
-      // Get the cursor position at line start
-      const bounds = editor.getBounds(line.offset(), 0);
-      const editorRoot = editor.root;
-      const editorBounds = editorRoot.getBoundingClientRect();
-
-      // Calculate absolute position
-      const top = bounds.top + editorBounds.top + window.scrollY - 4;
-      const left = editorBounds.left;
-
-      setPosition({ top, left });
-      setIsVisible(true);
-    };
-
-    // Handle Enter key press
-    const handleEnter = () => {
-      // Force immediate check and then another after DOM update
-      handleCursorChange();
-      requestAnimationFrame(() => {
-        handleCursorChange();
-      });
-    };
-
-    // Handle text changes
-    const handleTextChange = () => {
-      requestAnimationFrame(handleCursorChange);
-    };
-
-    // Handle keyboard events
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        handleEnter();
       }
     };
 
     // Set up event listeners
-    editor.on('selection-change', handleCursorChange);
-    editor.on('text-change', handleTextChange);
-    editor.root.addEventListener('keydown', handleKeyDown);
+    editor.on('selection-change', updateMenuVisibility);
+    editor.on('text-change', updateMenuVisibility);
 
-    // Initial position check
-    handleCursorChange();
+    // Initial check
+    updateMenuVisibility();
 
+    // Cleanup
     return () => {
-      editor.off('selection-change', handleCursorChange);
-      editor.off('text-change', handleTextChange);
-      editor.root.removeEventListener('keydown', handleKeyDown);
+      editor.off('selection-change', updateMenuVisibility);
+      editor.off('text-change', updateMenuVisibility);
     };
-  }, [quill]);
+  }, [editorRef.current]);
 
   const validateFileSize = (
     file: File,
@@ -212,9 +203,6 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
     document.body.appendChild(dialog);
 
     // Get elements
-    const urlTab = dialog.querySelector(
-      'button:first-child'
-    ) as HTMLButtonElement;
     const uploadTab = dialog.querySelector(
       'button:nth-child(2)'
     ) as HTMLButtonElement;
@@ -231,99 +219,105 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
         const urlObj = new URL(url);
         const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(urlObj.pathname);
         if (!isImage) {
-          throw new Error(
-            'URL must point to an image file (JPG, PNG, GIF, WebP)'
-          );
+          toast({
+            title: 'Invalid Image URL',
+            description:
+              'URL must point to an image file (JPG, PNG, GIF, WebP)',
+            variant: 'destructive',
+          });
+          return;
         }
 
-        const editor = quill.getEditor();
-        const selection = editor.getSelection(true) as RangeStatic;
+        const selection = quill.getSelection(true);
+        if (!selection) return;
 
         // Insert newline before image
-        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+        quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
 
         // Insert image with URL only
-        editor.insertEmbed(
+        quill.insertEmbed(
           selection.index + 1,
           'image',
           url,
           QUILL_SOURCES.USER
         );
 
-        // Move cursor after image
-        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
+        // Insert newline after image
+        quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
 
-        toast({
-          title: 'Success',
-          description: 'Image added successfully',
-        });
+        // Move cursor after image
+        quill.setSelection(selection.index + 3, 0, QUILL_SOURCES.SILENT);
+
+        // Close dialog
+        document.body.removeChild(dialog);
+        onClose();
       } catch (error) {
-        console.error('Image URL insert failed:', error);
         toast({
           title: 'Error',
           description:
-            error instanceof Error ? error.message : 'Invalid image URL',
+            error instanceof Error ? error.message : 'Failed to insert image',
           variant: 'destructive',
         });
       }
-
-      document.body.removeChild(dialog);
-      onClose();
     };
 
-    // Handle upload tab click
+    // Handle file upload
     uploadTab.onclick = () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (file) {
-          try {
-            setIsUploading(true);
-            const url = await uploadFile(file, 'image');
-            const editor = quill.getEditor();
-            const selection = editor.getSelection(true) as RangeStatic;
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.style.display = 'none';
 
-            // Insert newline before image
-            editor.insertText(selection.index, '\n', 'user');
+      fileInput.onchange = async (event) => {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file) return;
 
-            // Insert image with URL only
-            editor.insertEmbed(selection.index + 1, 'image', url, 'user');
+        try {
+          setIsUploading(true);
+          const url = await uploadFile(file, 'image');
 
-            // Move cursor after image
-            editor.setSelection(selection.index + 2, 0, 'silent');
+          const selection = quill.getSelection(true);
+          if (!selection) return;
 
-            toast({
-              title: 'Success',
-              description: 'Image uploaded successfully',
-            });
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message === 'File size exceeds limit'
-            ) {
-              // Already handled by validateFileSize
-              return;
-            }
-            console.error('Image upload failed:', error);
-            toast({
-              title: 'Error',
-              description: 'Failed to upload image. Please try again.',
-              variant: 'destructive',
-            });
-          } finally {
-            setIsUploading(false);
-          }
+          // Insert newline before image
+          quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+
+          // Insert image
+          quill.insertEmbed(
+            selection.index + 1,
+            'image',
+            url,
+            QUILL_SOURCES.USER
+          );
+
+          // Insert newline after image
+          quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
+
+          // Move cursor after image
+          quill.setSelection(selection.index + 3, 0, QUILL_SOURCES.SILENT);
+
+          // Close dialog
+          document.body.removeChild(dialog);
+          onClose();
+        } catch (error) {
+          toast({
+            title: 'Upload Failed',
+            description:
+              error instanceof Error ? error.message : 'Failed to upload image',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsUploading(false);
         }
-        document.body.removeChild(dialog);
       };
-      input.click();
+
+      fileInput.click();
     };
 
     // Handle dialog close
-    dialog.onclick = (e) => {
-      if (e.target === dialog) {
+    dialog.onclick = (event) => {
+      if (event.target === dialog) {
         document.body.removeChild(dialog);
         onClose();
       }
@@ -338,13 +332,13 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
     dialog.innerHTML = `
       <div class="bg-background rounded-lg shadow-lg w-[400px] p-4">
         <div class="flex border-b mb-4">
-          <button class="px-4 py-2 text-foreground border-b-2 border-primary">Embed link</button>
+          <button class="px-4 py-2 text-foreground border-b-2 border-primary">URL</button>
           <button class="px-4 py-2 text-muted-foreground">Upload</button>
         </div>
         <div class="space-y-4">
-          <input type="text" placeholder="Paste the video link..." class="w-full px-3 py-2 rounded-md border bg-background text-foreground" />
-          <div class="text-sm text-muted-foreground">Works with YouTube, Vimeo, Instagram, and TikTok</div>
-          <button class="w-full bg-primary text-primary-foreground rounded-md py-2">Embed video</button>
+          <input type="text" placeholder="Paste the video URL..." class="w-full px-3 py-2 rounded-md border bg-background text-foreground" />
+          <div class="text-sm text-muted-foreground">Supported formats: MP4, WebM</div>
+          <button class="w-full bg-primary text-primary-foreground rounded-md py-2">Add video</button>
         </div>
       </div>
     `;
@@ -352,161 +346,120 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
     document.body.appendChild(dialog);
 
     // Get elements
-    const embedTab = dialog.querySelector(
-      'button:first-child'
-    ) as HTMLButtonElement;
     const uploadTab = dialog.querySelector(
       'button:nth-child(2)'
     ) as HTMLButtonElement;
     const input = dialog.querySelector('input') as HTMLInputElement;
-    const embedButton = dialog.querySelector(
-      '.bg-primary'
-    ) as HTMLButtonElement;
+    const addButton = dialog.querySelector('.bg-primary') as HTMLButtonElement;
 
-    // Handle embed
-    embedButton.onclick = async () => {
+    // Handle URL insert
+    addButton.onclick = async () => {
       const url = input.value.trim();
       if (!url) return;
 
       try {
+        // Validate URL
         const urlObj = new URL(url);
-        let embedUrl: string;
-
-        // YouTube
-        if (
-          urlObj.hostname.includes('youtube.com') ||
-          urlObj.hostname.includes('youtu.be')
-        ) {
-          const videoId = url.split('v=')[1];
-          if (!videoId) {
-            throw new Error('Could not find YouTube video ID');
-          }
-          const ampersandPosition = videoId.indexOf('&');
-          const cleanVideoId =
-            ampersandPosition !== -1
-              ? videoId.substring(0, ampersandPosition)
-              : videoId;
-          embedUrl = `https://www.youtube.com/embed/${cleanVideoId}`;
-        }
-        // Vimeo
-        else if (urlObj.hostname.includes('vimeo.com')) {
-          const videoId = urlObj.pathname.split('/').pop();
-          if (!videoId) {
-            throw new Error('Could not find Vimeo video ID');
-          }
-          embedUrl = `https://player.vimeo.com/video/${videoId}`;
-        }
-        // Instagram
-        else if (urlObj.hostname.includes('instagram.com')) {
-          const postId = urlObj.pathname.split('/p/')[1]?.split('/')[0];
-          if (!postId) {
-            throw new Error('Could not find Instagram post ID');
-          }
-          embedUrl = `https://www.instagram.com/p/${postId}/embed`;
-        }
-        // TikTok
-        else if (urlObj.hostname.includes('tiktok.com')) {
-          const videoId = urlObj.pathname.split('/video/')[1];
-          if (!videoId) {
-            throw new Error('Could not find TikTok video ID');
-          }
-          embedUrl = `https://www.tiktok.com/embed/v2/${videoId}`;
-        } else {
-          throw new Error(
-            'Unsupported video platform. We support YouTube, Vimeo, Instagram, and TikTok.'
-          );
+        const isVideo = /\.(mp4|webm)$/i.test(urlObj.pathname);
+        if (!isVideo) {
+          toast({
+            title: 'Invalid Video URL',
+            description: 'URL must point to a video file (MP4, WebM)',
+            variant: 'destructive',
+          });
+          return;
         }
 
-        const editor = quill.getEditor();
-        const selection = editor.getSelection(true) as RangeStatic;
+        const selection = quill.getSelection(true);
+        if (!selection) return;
 
         // Insert newline before video
-        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+        quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
 
-        // Insert video embed
-        editor.insertEmbed(
+        // Insert video
+        quill.insertEmbed(
           selection.index + 1,
           'video',
-          embedUrl,
+          url,
           QUILL_SOURCES.USER
         );
 
-        // Move cursor after video
-        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
+        // Insert newline after video
+        quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
 
-        toast({
-          title: 'Success',
-          description: 'Video embedded successfully',
-        });
+        // Move cursor after video
+        quill.setSelection(selection.index + 3, 0, QUILL_SOURCES.SILENT);
+
+        // Close dialog
+        document.body.removeChild(dialog);
+        onClose();
       } catch (error) {
-        console.error('Video embed failed:', error);
         toast({
           title: 'Error',
           description:
-            error instanceof Error
-              ? error.message
-              : 'Failed to embed video. Please check the URL and try again.',
+            error instanceof Error ? error.message : 'Failed to insert video',
           variant: 'destructive',
         });
       }
-
-      document.body.removeChild(dialog);
-      onClose();
     };
 
-    // Handle upload tab click
+    // Handle file upload
     uploadTab.onclick = () => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'video/*';
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (file) {
-          try {
-            setIsUploading(true);
-            const url = await uploadFile(file, 'video');
-            const editor = quill.getEditor();
-            const selection = editor.getSelection(true) as RangeStatic;
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'video/*';
+      fileInput.style.display = 'none';
 
-            // Insert newline before video
-            editor.insertText(selection.index, '\n', 'user');
+      fileInput.onchange = async (event) => {
+        const target = event.target as HTMLInputElement;
+        const file = target.files?.[0];
+        if (!file) return;
 
-            // Insert video embed
-            editor.insertEmbed(selection.index + 1, 'video', url, 'user');
+        try {
+          setIsUploading(true);
+          const url = await uploadFile(file, 'video');
 
-            // Move cursor after video
-            editor.setSelection(selection.index + 2, 0, 'silent');
+          const selection = quill.getSelection(true);
+          if (!selection) return;
 
-            toast({
-              title: 'Success',
-              description: 'Video uploaded successfully',
-            });
-          } catch (error) {
-            if (
-              error instanceof Error &&
-              error.message === 'File size exceeds limit'
-            ) {
-              // Already handled by validateFileSize
-              return;
-            }
-            console.error('Video upload failed:', error);
-            toast({
-              title: 'Error',
-              description: 'Failed to upload video. Please try again.',
-              variant: 'destructive',
-            });
-          } finally {
-            setIsUploading(false);
-          }
+          // Insert newline before video
+          quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+
+          // Insert video
+          quill.insertEmbed(
+            selection.index + 1,
+            'video',
+            url,
+            QUILL_SOURCES.USER
+          );
+
+          // Insert newline after video
+          quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
+
+          // Move cursor after video
+          quill.setSelection(selection.index + 3, 0, QUILL_SOURCES.SILENT);
+
+          // Close dialog
+          document.body.removeChild(dialog);
+          onClose();
+        } catch (error) {
+          toast({
+            title: 'Upload Failed',
+            description:
+              error instanceof Error ? error.message : 'Failed to upload video',
+            variant: 'destructive',
+          });
+        } finally {
+          setIsUploading(false);
         }
-        document.body.removeChild(dialog);
       };
-      input.click();
+
+      fileInput.click();
     };
 
     // Handle dialog close
-    dialog.onclick = (e) => {
-      if (e.target === dialog) {
+    dialog.onclick = (event) => {
+      if (event.target === dialog) {
         document.body.removeChild(dialog);
         onClose();
       }
@@ -514,44 +467,57 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
   };
 
   const handleEmbedInsert = (): void => {
-    const url = window.prompt('Enter URL (YouTube, Vimeo, Twitter, etc.):');
-    if (url) {
-      try {
-        const editor = quill.getEditor();
-        const selection = editor.getSelection(true) as RangeStatic;
+    const selection = quill.getSelection(true);
+    if (!selection) return;
 
-        // Insert newline before embed
-        editor.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+    const url = window.prompt('Enter URL to embed:');
+    if (!url) return;
 
-        // Insert embed
-        editor.insertEmbed(selection.index + 1, 'embed', { url });
+    try {
+      // Insert newline before embed
+      quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
 
-        // Move cursor after embed
-        editor.setSelection(selection.index + 2, 0, QUILL_SOURCES.SILENT);
+      // Insert embed
+      quill.insertEmbed(selection.index + 1, 'embed', url, QUILL_SOURCES.USER);
 
-        toast({
-          title: 'Success',
-          description: 'Content embedded successfully',
-        });
-      } catch (error) {
-        console.error('Embed insertion failed:', error);
-        toast({
-          title: 'Error',
-          description:
-            'Failed to embed content. Please check the URL and try again.',
-          variant: 'destructive',
-        });
-      }
+      // Insert newline after embed
+      quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
+
+      // Move cursor after embed
+      quill.setSelection(selection.index + 3, 0, QUILL_SOURCES.SILENT);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'Failed to insert embed',
+        variant: 'destructive',
+      });
     }
-    onClose();
   };
 
   const handleCodeBlockInsert = (): void => {
-    const editor = quill.getEditor();
-    const selection = editor.getSelection(true) as RangeStatic;
-    editor.format('code-block', true);
-    editor.setSelection(selection.index + 1, 0);
-    onClose();
+    const selection = quill.getSelection(true);
+    if (!selection) return;
+
+    try {
+      // Insert newlines and code block
+      quill.insertText(selection.index, '\n', QUILL_SOURCES.USER);
+      quill.insertText(selection.index + 1, ' ', QUILL_SOURCES.USER);
+      quill.format('code-block', true);
+      quill.insertText(selection.index + 2, '\n', QUILL_SOURCES.USER);
+
+      // Move cursor to code block
+      quill.setSelection(selection.index + 1, 0, QUILL_SOURCES.SILENT);
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description:
+          error instanceof Error
+            ? error.message
+            : 'Failed to insert code block',
+        variant: 'destructive',
+      });
+    }
   };
 
   const toggleMenu = (): void => {
@@ -564,32 +530,62 @@ export function PlusMenu({ quill, onClose }: PlusMenuProps): JSX.Element {
         <div
           style={{
             position: 'absolute',
-            top: 0,
-            left: 0,
-            transform: `translate3d(${position.left - 40}px, ${position.top}px, 0)`,
+            top: `${position.top}px`,
+            left: `${position.left}px`,
             display: 'inline-flex',
             alignItems: 'center',
             gap: '8px',
+            pointerEvents: 'auto',
+            zIndex: 9999,
           }}
         >
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleMenu}
-            className={`plus-button z-[9999] ${isOpen ? 'open' : ''}`}
+            className={`plus-button ${isOpen ? 'open' : ''}`}
             aria-label="Add content"
             disabled={isUploading}
             data-tooltip="Add an image, video, link, or codeblock"
           >
             {isUploading ? (
-              <Icons.spinner className="h-5 w-5 animate-spin" />
+              <svg
+                className="h-5 w-5 animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
             ) : (
               <EditorIcons.plus className="h-5 w-5" />
             )}
           </Button>
 
           {isOpen && (
-            <div className="plus-menu z-[9999]">
+            <div
+              className="plus-menu"
+              style={{
+                position: 'absolute',
+                left: '100%',
+                marginLeft: '8px',
+                top: '0',
+                zIndex: 9999,
+                pointerEvents: 'auto',
+              }}
+            >
               <Button
                 className="plus-menu-btn"
                 onClick={handleImageUpload}

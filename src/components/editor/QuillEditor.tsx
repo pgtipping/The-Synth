@@ -1,9 +1,12 @@
 'use client';
 
-import ReactQuill from 'react-quill';
+import * as React from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
-import { useEffect, useRef, useState } from 'react';
-import 'react-quill/dist/quill.bubble.css';
+import type { QuillInstance, QuillRange } from './types';
+import type { Range, EmitterSource } from 'quill';
+import Delta from 'quill-delta';
+import 'react-quill-new/dist/quill.core.css';
 import '../../app/styles/editor.css';
 import { FloatingToolbar } from './FloatingToolbar';
 import { PlusMenu } from './PlusMenu';
@@ -15,13 +18,16 @@ interface QuillEditorProps {
   placeholder?: string;
 }
 
-// Dynamically import ReactQuill with no SSR
+// Memoize the ReactQuill component wrapper
 const ReactQuillComponent = dynamic(
   async () => {
-    const { default: RQ } = await import('react-quill');
-    return function comp({ forwardedRef, ...props }: any) {
-      return <RQ ref={forwardedRef} {...props} />;
-    };
+    await registerFormats();
+    const { default: RQ } = await import('react-quill-new');
+    const MemoizedQuill = React.memo(function QuillWithRef(props: any) {
+      const editorRef = useRef<any>(null);
+      return <RQ ref={editorRef} {...props} />;
+    });
+    return MemoizedQuill;
   },
   { ssr: false }
 );
@@ -31,88 +37,136 @@ export default function QuillEditor({
   onChange,
   placeholder,
 }: QuillEditorProps) {
-  const quillRef = useRef<ReactQuill>(null);
-  const [selection, setSelection] = useState<{
-    index: number;
-    length: number;
-  } | null>(null);
+  const editorRef = useRef<any>(null);
+  const [quill, setQuill] = useState<QuillInstance | null>(null);
+  const [isEditorReady, setIsEditorReady] = useState(false);
+  const [isContentSet, setIsContentSet] = useState(false);
+  const mountedRef = useRef(true);
 
+  // Memoize the editor configuration
+  const editorConfig = useMemo(
+    () => ({
+      theme: 'bubble',
+      placeholder: placeholder || 'Write your blog post...',
+      modules: {
+        clipboard: {
+          matchVisual: false,
+        },
+        keyboard: {
+          bindings: {
+            tab: false,
+            enter: {
+              key: 13,
+              handler: () => true,
+            },
+          },
+        },
+        toolbar: false,
+        history: {
+          delay: 1000,
+          maxStack: 100,
+          userOnly: true,
+        },
+      },
+      className: 'editor-wrapper',
+      preserveWhitespace: true,
+    }),
+    [placeholder]
+  );
+
+  // Initialize editor with cleanup
   useEffect(() => {
-    const initQuill = async () => {
-      if (!quillRef.current) return;
+    if (!editorRef.current) return;
 
-      // Register formats on the client side
-      await registerFormats();
+    let isMounted = true;
+    const editor = editorRef.current;
 
-      const editor = quillRef.current.getEditor();
-
-      // Configure Quill for Medium-like experience
-      editor.root.dataset.placeholder = placeholder || 'Tell your story...';
-
-      // Handle selection changes
-      editor.on('selection-change', (range) => {
-        if (range && range.length > 0) {
-          setSelection(range);
-        } else {
-          setSelection(null);
+    const initializeEditor = () => {
+      try {
+        const quillInstance = editor.getEditor();
+        if (
+          quillInstance?.root &&
+          document.contains(quillInstance.root) &&
+          isMounted
+        ) {
+          setQuill(quillInstance);
+          setIsEditorReady(true);
         }
-      });
+      } catch (error) {
+        console.error('Failed to initialize editor:', error);
+      }
     };
 
-    initQuill();
-  }, [placeholder, quillRef.current]);
+    // Initialize immediately and after a short delay
+    initializeEditor();
+    const timer = setTimeout(initializeEditor, 100);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, []);
+
+  // Handle content updates
+  useEffect(() => {
+    if (!quill || !isEditorReady || isContentSet || !mountedRef.current) return;
+
+    try {
+      // Ensure we only set content once when editor is ready
+      setIsContentSet(true);
+
+      // Set initial content with a slight delay to ensure editor is ready
+      const timer = setTimeout(() => {
+        if (!mountedRef.current) return;
+
+        try {
+          const contents = value ? JSON.parse(value) : { ops: [] };
+          const delta = new Delta(contents);
+          quill.setContents(delta);
+        } catch (error) {
+          console.error('Failed to set initial content:', error);
+          quill.setContents(new Delta({ ops: [] }));
+        }
+      }, 100);
+
+      return () => {
+        clearTimeout(timer);
+      };
+    } catch (error) {
+      console.error('Error in content update effect:', error);
+    }
+  }, [quill, isEditorReady, value, isContentSet]);
+
+  // Handle editor changes
+  useEffect(() => {
+    if (!quill || !isEditorReady || !mountedRef.current) return;
+
+    const handleChange = () => {
+      if (onChange && mountedRef.current) {
+        try {
+          const contents = quill.getContents();
+          onChange(JSON.stringify(contents));
+        } catch (error) {
+          console.error('Failed to handle editor change:', error);
+        }
+      }
+    };
+
+    quill.on('text-change', handleChange);
+    return () => {
+      quill.off('text-change', handleChange);
+    };
+  }, [quill, isEditorReady, onChange]);
 
   return (
-    <>
-      <div className="editor-wrapper relative">
-        <ReactQuillComponent
-          forwardedRef={quillRef}
-          theme="bubble"
-          value={value}
-          onChange={onChange}
-          placeholder={placeholder}
-          className="min-h-[500px] p-4"
-          modules={{
-            toolbar: false,
-            keyboard: {
-              bindings: {
-                tab: false,
-                'list autofill': false,
-                'hr autofill': false,
-                'code block': false,
-              },
-            },
-          }}
-          formats={[
-            'bold',
-            'italic',
-            'underline',
-            'strike',
-            'link',
-            'blockquote',
-            'header',
-            'code-block',
-            'divider',
-            'image',
-            'video',
-            'audio',
-            'embed',
-          ]}
-        />
-
-        {quillRef.current && selection && (
-          <FloatingToolbar quill={quillRef.current} selection={selection} />
-        )}
-      </div>
-      {quillRef.current && (
-        <PlusMenu
-          quill={quillRef.current}
-          onClose={() => {
-            const editor = quillRef.current?.getEditor();
-            editor?.focus();
-          }}
-        />
+    <div className="relative min-h-[500px] w-full">
+      {isEditorReady && quill && (
+        <>
+          <FloatingToolbar selection={null} quill={quill} />
+          <PlusMenu quill={quill} />
+        </>
       )}
-    </>
+      <ReactQuillComponent ref={editorRef} {...editorConfig} />
+    </div>
   );
 }

@@ -3,12 +3,12 @@
 import { useState } from 'react';
 
 interface UploadHandlerProps {
-  onUpload: (file: File, type: 'image' | 'video' | 'audio') => Promise<string>;
+  _onUpload: (file: File, type: 'image' | 'video' | 'audio') => Promise<string>;
   onError: (error: string) => void;
 }
 
 export default function UploadHandler({
-  onUpload,
+  _onUpload,
   onError,
 }: UploadHandlerProps) {
   const [isUploading, setIsUploading] = useState(false);
