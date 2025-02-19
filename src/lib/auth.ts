@@ -1,23 +1,11 @@
-import { PrismaAdapter } from '@auth/prisma-adapter';
-import { DefaultSession, SessionStrategy } from 'next-auth';
-import { type JWT } from 'next-auth/jwt';
+import { AuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import { PrismaAdapter } from '@auth/prisma-adapter';
+import { prisma } from '@/lib/prisma';
 import { compare } from 'bcryptjs';
-import { db } from '@/lib/db';
-import { type User } from '@prisma/client';
 
-declare module 'next-auth' {
-  interface Session extends DefaultSession {
-    user: {
-      id: string;
-      emailVerified: Date | null;
-      email: string;
-    };
-  }
-}
-
-export const authOptions = {
-  adapter: PrismaAdapter(db),
+export const authOptions: AuthOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -25,51 +13,45 @@ export const authOptions = {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
       },
-      async authorize(credentials): Promise<any> {
+      async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error('Missing credentials');
+          return null;
         }
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
+        const user = await prisma.user.findUnique({
+          where: {
+            email: credentials.email,
+          },
         });
 
-        if (!user || !user.password) {
-          throw new Error('Invalid credentials');
+        if (!user) {
+          return null;
         }
 
-        const isValid = await compare(credentials.password, user.password);
+        const isPasswordValid = await compare(
+          credentials.password,
+          user.password!
+        );
 
-        if (!isValid) {
-          throw new Error('Invalid credentials');
+        if (!isPasswordValid) {
+          return null;
         }
 
         return {
           id: user.id,
           email: user.email,
           name: user.name,
+          image: user.image,
         };
       },
     }),
   ],
-  callbacks: {
-    async session({ session, token }: { session: any; token: JWT }) {
-      if (session.user) {
-        session.user.id = token.sub!;
-      }
-      return session;
-    },
-    async jwt({ token, user }: { token: JWT; user: User | null }) {
-      if (user) {
-        token.email = user.email;
-      }
-      return token;
-    },
-  },
   session: {
-    strategy: 'jwt' as SessionStrategy,
+    strategy: 'jwt',
   },
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: process.env.NODE_ENV === 'development',
   pages: {
-    signIn: '/login',
+    signIn: '/auth/signin',
   },
 };

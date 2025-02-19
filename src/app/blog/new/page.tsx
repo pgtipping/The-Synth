@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,14 +15,21 @@ import { type RouterOutputs, type AppRouter } from '@/server/api/root';
 import { type TRPCClientErrorLike } from '@trpc/client';
 import { CategoryList } from '@/components/category/CategoryList';
 import { TagList } from '@/components/tag/TagList';
+import { useSession } from 'next-auth/react';
+import { EditorErrorBoundary } from '@/components/editor/EditorErrorBoundary';
 
 const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
   ssr: false,
+  loading: () => (
+    <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
+  ),
 });
 
 export default function CreatePost() {
   const router = useRouter();
   const { toast } = useToast();
+  const { data: session, status } = useSession();
+  const [mounted, setMounted] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [showPreview, setShowPreview] = useState(false);
@@ -63,6 +70,40 @@ export default function CreatePost() {
     },
   });
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Handle authentication after all hooks are called
+  useEffect(() => {
+    if (mounted && !session && status !== 'loading') {
+      router.push('/api/auth/signin');
+    }
+  }, [mounted, session, status, router]);
+
+  // Memoize the editor component
+  const memoizedEditor = useMemo(
+    () => (
+      <EditorErrorBoundary>
+        <QuillEditor
+          key="editor"
+          value={content}
+          onChange={setContent}
+          placeholder="Write your blog post..."
+        />
+      </EditorErrorBoundary>
+    ),
+    [content, setContent]
+  );
+
+  // Memoize title change handler
+  const handleTitleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setTitle(e.target.value);
+    },
+    []
+  );
+
   const handleSaveDraft = async () => {
     if (!title || !content) {
       toast({
@@ -90,11 +131,6 @@ export default function CreatePost() {
     }
 
     try {
-      console.log('Publishing post with:', {
-        titleLength: title.length,
-        contentLength: content.length,
-      });
-
       const sanitizedContent = content
         .replace(/javascript:/gi, '')
         .replace(/data:/gi, '')
@@ -139,6 +175,25 @@ export default function CreatePost() {
 
     window.open(`/drafts/preview/${result.data.id}`, '_blank');
   };
+
+  // Show loading state while checking authentication
+  if (!mounted || status === 'loading') {
+    return (
+      <MainLayout>
+        <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+          <div className="space-y-4">
+            <div className="h-12 w-48 animate-pulse rounded-md bg-muted" />
+            <div className="h-96 animate-pulse rounded-lg bg-muted" />
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
+
+  // Don't render anything while redirecting
+  if (!session) {
+    return null;
+  }
 
   return (
     <MainLayout>
@@ -199,15 +254,11 @@ export default function CreatePost() {
               placeholder="Enter your blog title..."
               className="border-none bg-transparent text-4xl font-bold placeholder:text-muted-foreground/50 focus-visible:ring-0"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
             />
 
             <div className="min-h-[500px] rounded-lg border bg-card">
-              <QuillEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your blog post..."
-              />
+              {memoizedEditor}
             </div>
 
             <div className="space-y-6">

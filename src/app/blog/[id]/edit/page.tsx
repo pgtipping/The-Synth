@@ -9,8 +9,7 @@ import { trpc } from '@/lib/trpc';
 import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { type RouterOutputs } from '@/server/api/root';
+import React, { useEffect, useState, Suspense } from 'react';
 import { type TRPCClientErrorLike } from '@trpc/client';
 import { type AppRouter } from '@/server/api/root';
 import { CategoryList } from '@/components/category/CategoryList';
@@ -18,9 +17,13 @@ import { TagList } from '@/components/tag/TagList';
 
 const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
   ssr: false,
+  loading: () => (
+    <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
+  ),
 });
 
 export default function EditPost({ params }: { params: { id: string } }) {
+  const id = params.id;
   const router = useRouter();
   const { toast } = useToast();
   const [title, setTitle] = useState('');
@@ -33,7 +36,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
     data: post,
     isLoading,
     error,
-  } = trpc.posts.getPostById.useQuery({ id: params.id });
+  } = trpc.posts.getPostById.useQuery({ id });
 
   // Initialize form data once when post is loaded
   useEffect(() => {
@@ -101,8 +104,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
           <div className="text-center">
             <h1 className="text-2xl font-bold">Post not found</h1>
             <p className="mt-2 text-muted-foreground">
-              The post you're looking for doesn't exist or you don't have
-              permission to edit it.
+              The post you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have permission to edit it.
             </p>
           </div>
         </div>
@@ -126,7 +129,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
       .replace(/vbscript:/gi, '');
 
     updateDraft.mutate({
-      id: params.id,
+      id,
       title,
       content: sanitizedContent,
       categoryIds: selectedCategoryIds,
@@ -145,7 +148,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
 
     // First save any changes
     await updateDraft.mutateAsync({
-      id: params.id,
+      id,
       title,
       content,
       categoryIds: selectedCategoryIds,
@@ -154,7 +157,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
 
     // Then publish the post
     togglePublish.mutate({
-      id: params.id,
+      id,
       published: true,
     });
   };
@@ -163,7 +166,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
     <MainLayout>
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
         <div className="mb-8 flex items-center justify-between">
-          <Link href={`/blog/${params.id}`} className="nav-button">
+          <Link href={`/blog/${id}`} className="nav-button">
             <ArrowLeftIcon className="icon-sm mr-2" />
             Back to Post
           </Link>
@@ -191,11 +194,17 @@ export default function EditPost({ params }: { params: { id: string } }) {
           />
 
           <div className="min-h-[500px] rounded-lg border bg-card">
-            <QuillEditor
-              value={content}
-              onChange={setContent}
-              placeholder="Write your blog post..."
-            />
+            <Suspense
+              fallback={
+                <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
+              }
+            >
+              <QuillEditor
+                value={content}
+                onChange={setContent}
+                placeholder="Write your blog post..."
+              />
+            </Suspense>
           </div>
 
           <div className="space-y-6">

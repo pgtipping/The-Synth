@@ -9,6 +9,8 @@ import { PostCard } from '@/components/blog/post-card';
 import { db } from '@/server/db';
 import { mockBlogs } from '@/lib/mock-data';
 import { HeroButtons } from '@/components/home/hero-buttons';
+import { logger } from '@/lib/logger';
+import { type PostWithRelations } from '@/types/post';
 
 const POSTS_PER_PAGE = 6;
 
@@ -40,7 +42,7 @@ export default async function Home() {
   });
 
   // Transform posts for display
-  const transformedPosts = publishedPosts.map((post) => {
+  const transformedPosts = publishedPosts.map((post: PostWithRelations) => {
     // Extract image URL from content
     const imageMatch = post.content.match(/<img[^>]+src="([^">]+)"/);
     let imageUrl = imageMatch ? imageMatch[1] : '';
@@ -51,9 +53,9 @@ export default async function Home() {
     }
 
     // Debug log
-    console.log('Post ID:', post.id);
-    console.log('Post content:', post.content);
-    console.log('Extracted image URL:', imageUrl);
+    logger.info('Post ID:', post.id);
+    logger.info('Post content:', post.content);
+    logger.info('Extracted image URL:', imageUrl);
 
     // Remove image tag from content before creating excerpt
     const contentWithoutImage = post.content.replace(

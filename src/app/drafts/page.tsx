@@ -19,6 +19,23 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/components/ui/use-toast';
 
+interface Draft {
+  id: string;
+  title: string;
+  content: string;
+  updatedAt: string;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+  tags: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
+}
+
 export default function DraftsPage() {
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -81,13 +98,13 @@ export default function DraftsPage() {
           ) : draftsData?.items.length === 0 ? (
             <div className="rounded-lg border bg-card p-8 text-center">
               <h2 className="text-xl font-semibold">No drafts yet</h2>
-              <p className="mt-2 text-muted-foreground">
-                Start writing your first post by clicking the "New Post" button
-                above.
+              <p className="text-muted-foreground">
+                You haven&apos;t created any drafts yet. Click &quot;New
+                Post&quot; to get started.
               </p>
             </div>
           ) : (
-            draftsData?.items.map((draft) => (
+            draftsData?.items.map((draft: Draft) => (
               <article
                 key={draft.id}
                 className="rounded-lg border bg-card p-6 transition-shadow hover:shadow-md"

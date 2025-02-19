@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { MainLayout } from '@/components/layout/main-layout';
 import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -9,29 +10,39 @@ import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { useEffect } from 'react';
 import { PostActions } from '@/components/blog/post-actions';
+import { logger } from '@/lib/logger';
+import { type RouterOutputs } from '@/server/api/root';
+
+type Post = RouterOutputs['posts']['getPostById'];
+type Category = Post['categories'][number];
+type Tag = Post['tags'][number];
 
 export default function BlogPost({ params }: { params: { id: string } }) {
   const { data: session } = useSession();
   const { toast } = useToast();
+  const id = params.id;
   const {
     data: post,
     isLoading,
     error,
     refetch,
-  } = trpc.posts.getPostById.useQuery({ id: params.id });
+  } = trpc.posts.getPostById.useQuery({ id });
 
   // Debug logging
   useEffect(() => {
     if (post) {
-      console.log('Full post data:', JSON.stringify(post, null, 2));
-      console.log('Categories:', {
+      logger.info('Full post data:', JSON.stringify(post, null, 2));
+      logger.info('Categories:', {
         raw: post.categories,
-        mapped: post.categories.map((c) => ({ id: c.id, name: c.name })),
+        mapped: post.categories.map((c: Category) => ({
+          id: c.id,
+          name: c.name,
+        })),
         count: post.categories.length,
       });
-      console.log('Tags:', {
+      logger.info('Tags:', {
         raw: post.tags,
-        mapped: post.tags.map((t) => ({ id: t.id, name: t.name })),
+        mapped: post.tags.map((t: Tag) => ({ id: t.id, name: t.name })),
         count: post.tags.length,
       });
     }
@@ -110,7 +121,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                     </div>
                     {(post.categories.length > 0 || post.tags.length > 0) && (
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {post.categories.map((category) => (
+                        {post.categories.map((category: Category) => (
                           <Link
                             key={category.id}
                             href={`/blog/category/${category.slug}`}
@@ -119,7 +130,7 @@ export default function BlogPost({ params }: { params: { id: string } }) {
                             {category.name}
                           </Link>
                         ))}
-                        {post.tags.map((tag) => (
+                        {post.tags.map((tag: Tag) => (
                           <Link
                             key={tag.id}
                             href={`/blog/tag/${tag.slug}`}

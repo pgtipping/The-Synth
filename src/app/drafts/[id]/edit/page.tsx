@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/components/ui/use-toast';
 import { trpc } from '@/lib/trpc';
-import { type RouterOutputs, type AppRouter } from '@/server/api/root';
+import { type AppRouter } from '@/server/api/root';
 import { type TRPCClientErrorLike } from '@trpc/client';
 import { CategoryList } from '@/components/category/CategoryList';
 import { TagList } from '@/components/tag/TagList';
@@ -42,8 +42,10 @@ export default function EditPost({ params }: { params: { id: string } }) {
     if (post && !isInitialized) {
       setTitle(post.title);
       setContent(post.content);
-      setSelectedCategoryIds(post.categories.map((c) => c.id));
-      setSelectedTagIds(post.tags.map((t) => t.id));
+      setSelectedCategoryIds(
+        post.categories.map((category: { id: string }) => category.id)
+      );
+      setSelectedTagIds(post.tags.map((tag: { id: string }) => tag.id));
       setIsInitialized(true);
     }
   }, [post, isInitialized]);
@@ -128,8 +130,8 @@ export default function EditPost({ params }: { params: { id: string } }) {
           <div className="text-center">
             <h1 className="text-2xl font-bold">Post not found</h1>
             <p className="mt-2 text-muted-foreground">
-              The post you're looking for doesn't exist or you don't have
-              permission to edit it.
+              The post you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have permission to edit it.
             </p>
           </div>
         </div>
