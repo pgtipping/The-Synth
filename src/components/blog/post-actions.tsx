@@ -5,9 +5,8 @@ import { EditIcon, TrashIcon, EyeIcon, EyeOffIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import { useToast } from '@/components/ui/use-toast';
-import { type RouterOutputs } from '@/server/api/root';
-import { type TRPCClientErrorLike } from '@trpc/client';
 import { type AppRouter } from '@/server/api/root';
+import { type TRPCClientErrorLike } from '@trpc/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,8 +24,6 @@ interface PostActionsProps {
   published: boolean;
   onPublishToggle?: () => void;
 }
-
-type Post = RouterOutputs['posts']['getPostById'];
 
 export function PostActions({
   postId,
