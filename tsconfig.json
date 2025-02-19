@@ -14,6 +14,10 @@
     "jsx": "preserve",
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
+    "skipDefaultLibCheck": true,
+    "ignoreDeprecations": "5.0",
+    "noImplicitAny": false,
+    "typeRoots": ["./node_modules/@types"],
     "plugins": [
       {
         "name": "next"
