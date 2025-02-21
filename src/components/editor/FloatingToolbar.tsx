@@ -68,29 +68,61 @@ export function FloatingToolbar({
   });
 
   const updatePosition = useCallback(() => {
-    if (!quill || !selection || selection.length === 0) {
+    if (!quill || !selection) {
+      console.log('FloatingToolbar Debug: Missing quill or selection');
+      console.log('FloatingToolbar Debug: Quill:', !!quill);
+      console.log('FloatingToolbar Debug: Selection:', selection);
       setIsVisible(false);
       return;
     }
 
     try {
-      const bounds = quill.getBounds(selection.index, selection.length);
-      if (!bounds) {
+      console.log('FloatingToolbar Debug: Updating position');
+      // Only show for non-empty selections
+      if (selection.length === 0) {
+        console.log('FloatingToolbar Debug: Empty selection');
         setIsVisible(false);
         return;
       }
 
-      setPosition({
-        top: bounds.top - 50,
-        left: bounds.left + bounds.width / 2 + 200,
+      console.log('FloatingToolbar Debug: Selection:', {
+        index: selection.index,
+        length: selection.length,
       });
+
+      // Get the bounds of the selection
+      const rangeBounds = quill.getBounds(selection.index, selection.length);
+      if (!rangeBounds) {
+        console.log('FloatingToolbar Debug: No range bounds');
+        setIsVisible(false);
+        return;
+      }
+
+      console.log('FloatingToolbar Debug: Range bounds:', rangeBounds);
+
+      // Get editor root element bounds
+      const editorBounds = quill.root.getBoundingClientRect();
+      const editorTop = window.scrollY + editorBounds.top;
+
+      // Calculate toolbar position
+      const toolbarTop = editorTop + rangeBounds.top - 10; // Position above selection
+      const toolbarLeft = editorBounds.left + rangeBounds.left;
+
+      const toolbarPosition = {
+        top: toolbarTop,
+        left: toolbarLeft,
+      };
+
+      console.log('FloatingToolbar Debug: Setting position:', toolbarPosition);
+
+      // Set position and show toolbar
+      setPosition(toolbarPosition);
       setIsVisible(true);
     } catch (error) {
-      toast({
-        title: 'Editor Error',
-        description: 'Failed to update toolbar position',
-        variant: 'destructive',
-      });
+      console.error(
+        'FloatingToolbar Debug: Position update failed',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
       setIsVisible(false);
     }
   }, [quill, selection]);
@@ -144,13 +176,87 @@ export function FloatingToolbar({
   }, [quill, selection]);
 
   useEffect(() => {
-    if (selection && selection.length > 0) {
+    if (!quill || !selection) {
+      console.log(
+        'FloatingToolbar Debug: Missing quill or selection in effect'
+      );
+      console.log('FloatingToolbar Debug: Quill:', !!quill);
+      console.log('FloatingToolbar Debug: Selection:', selection);
+      setIsVisible(false);
+      return;
+    }
+
+    // Only show toolbar for non-empty selections
+    if (selection.length > 0) {
+      console.log('FloatingToolbar Debug: Valid selection detected');
+      console.log('FloatingToolbar Debug: Selection:', selection);
+      // Update immediately and then again after a short delay
       updatePosition();
-      updateFormats();
+      const positionTimeout = setTimeout(() => {
+        console.log('FloatingToolbar Debug: Running delayed position update');
+        updatePosition();
+        updateFormats();
+      }, 10);
+
+      return () => {
+        console.log('FloatingToolbar Debug: Cleaning up position timeout');
+        clearTimeout(positionTimeout);
+      };
     } else {
+      console.log('FloatingToolbar Debug: No selection length, hiding toolbar');
       setIsVisible(false);
     }
-  }, [selection, updatePosition, updateFormats]);
+  }, [quill, selection, updatePosition, updateFormats]);
+
+  // Add scroll and resize handlers
+  useEffect(() => {
+    if (!quill?.root) {
+      console.log('FloatingToolbar: No quill root for viewport handlers');
+      return;
+    }
+
+    console.log('FloatingToolbar: Setting up viewport handlers');
+    const handleViewportChange = () => {
+      const currentSelection = quill.getSelection();
+      if (currentSelection && currentSelection.length > 0) {
+        console.log('FloatingToolbar: Viewport change with selection');
+        requestAnimationFrame(updatePosition);
+      }
+    };
+
+    // Listen for scroll events on both window and editor root
+    window.addEventListener('scroll', handleViewportChange, { passive: true });
+    window.addEventListener('resize', handleViewportChange, { passive: true });
+    quill.root.addEventListener('scroll', handleViewportChange, {
+      passive: true,
+    });
+
+    return () => {
+      console.log('FloatingToolbar: Cleaning up viewport handlers');
+      window.removeEventListener('scroll', handleViewportChange);
+      window.removeEventListener('resize', handleViewportChange);
+      quill.root.removeEventListener('scroll', handleViewportChange);
+    };
+  }, [quill, updatePosition]);
+
+  // Add styles to ensure toolbar is visible
+  const toolbarStyle = {
+    position: 'fixed' as const,
+    top: `${position.top}px`,
+    left: `${position.left}px`,
+    zIndex: 9999,
+    backgroundColor: 'var(--background)',
+    borderRadius: 'var(--radius)',
+    border: '1px solid var(--border)',
+    padding: '4px',
+    display: 'flex',
+    gap: '2px',
+    alignItems: 'center',
+    boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+    pointerEvents: 'auto' as const,
+    userSelect: 'none' as const,
+    transform: 'translateY(-100%)',
+  };
 
   const toggleFormat = (format: keyof FormatState): void => {
     if (!quill || !selection) return;
@@ -214,14 +320,7 @@ export function FloatingToolbar({
   if (!isVisible) return null;
 
   return (
-    <div
-      ref={toolbarRef}
-      className={styles.toolbar}
-      style={{
-        top: position.top + 'px',
-        left: position.left + 'px',
-      }}
-    >
+    <div ref={toolbarRef} className={styles.toolbar} style={toolbarStyle}>
       <Button
         variant={formats.bold ? 'default' : 'ghost'}
         size="icon"

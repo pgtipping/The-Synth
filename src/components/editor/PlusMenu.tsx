@@ -79,64 +79,119 @@ export function PlusMenu({
   // Keep a stable reference to the editor instance
   useEffect(() => {
     if (quill?.root && document.contains(quill.root)) {
+      console.log('PlusMenu Debug: Setting editor reference');
       editorRef.current = quill;
     }
   }, [quill]);
 
   useEffect(() => {
     if (!editorRef.current) {
+      console.log('PlusMenu Debug: No editor reference available');
       setIsVisible(false);
       return;
     }
 
     const editor = editorRef.current;
+    console.log('PlusMenu Debug: Editor instance available');
 
     // Simplified handler for cursor/text changes
     const updateMenuVisibility = () => {
       try {
+        console.log('PlusMenu Debug: Checking visibility...');
         const selection = editor.getSelection();
         if (!selection) {
+          console.log('PlusMenu Debug: No selection found');
           setIsVisible(false);
           return;
         }
 
         // Get text content of current line
         const [line] = editor.getLine(selection.index);
-        const lineContent = editor.getText(line.offset(), line.length());
+        if (!line) {
+          console.log('PlusMenu Debug: No line found');
+          setIsVisible(false);
+          return;
+        }
 
-        // Simple rule: show menu if cursor is at start of empty line
-        const shouldShow =
-          selection.index === line.offset() && lineContent.trim() === '';
+        // Get the line's content and check if it's empty
+        const lineStart = line.offset();
+        const lineContent = editor.getText(lineStart, line.length());
+        const isPlaceholderLine =
+          lineContent === '\n' || lineContent.trim() === '';
+        const isCursorAtStart = selection.index === lineStart;
 
-        if (shouldShow) {
+        console.log('PlusMenu Debug:', {
+          lineContent: JSON.stringify(lineContent),
+          isPlaceholderLine,
+          isCursorAtStart,
+          selectionIndex: selection.index,
+          lineStart,
+          lineLength: line.length(),
+          totalLength: editor.getLength(),
+        });
+
+        // Show menu if cursor is at start of empty or placeholder line
+        if (isPlaceholderLine && isCursorAtStart) {
+          console.log('PlusMenu Debug: Conditions met for showing menu');
           const bounds = editor.getBounds(selection.index, 0);
-          const editorBounds = editor.root.getBoundingClientRect();
+          if (!bounds) {
+            console.log('PlusMenu Debug: No bounds found');
+            setIsVisible(false);
+            return;
+          }
 
-          setPosition({
-            top: bounds.top + editorBounds.top + window.scrollY,
-            left: editorBounds.left + 40,
-          });
+          const editorBounds = editor.root.getBoundingClientRect();
+          const editorTop = window.scrollY + editorBounds.top;
+
+          // Position menu to the left of the cursor
+          const menuPosition = {
+            top: editorTop + bounds.top,
+            left: editorBounds.left + 8,
+          };
+
+          console.log('PlusMenu Debug: Setting position:', menuPosition);
+          setPosition(menuPosition);
           setIsVisible(true);
         } else {
+          console.log('PlusMenu Debug: Conditions not met for showing menu');
           setIsVisible(false);
         }
       } catch (error) {
-        console.error('PlusMenu: Update failed', error);
+        console.error(
+          'PlusMenu Debug: Update failed',
+          error instanceof Error ? error.message : 'Unknown error'
+        );
         setIsVisible(false);
       }
     };
 
+    // Initial check with delay to ensure editor is ready
+    const initTimeout = setTimeout(() => {
+      console.log('PlusMenu Debug: Running initial visibility check');
+      updateMenuVisibility();
+    }, 50);
+
     // Set up event listeners
+    console.log('PlusMenu Debug: Setting up event listeners');
+    editor.on('editor-change', updateMenuVisibility);
     editor.on('selection-change', updateMenuVisibility);
     editor.on('text-change', updateMenuVisibility);
 
-    // Initial check
-    updateMenuVisibility();
+    // Add focus handler to check visibility when editor gains focus
+    const handleFocus = () => {
+      console.log('PlusMenu Debug: Editor focused');
+      updateMenuVisibility();
+    };
+    editor.root.addEventListener('focus', handleFocus);
 
     // Cleanup
     return () => {
+      console.log('PlusMenu Debug: Cleaning up event listeners');
+      clearTimeout(initTimeout);
+      editor.off('editor-change', updateMenuVisibility);
       editor.off('selection-change', updateMenuVisibility);
       editor.off('text-change', updateMenuVisibility);
+      editor.root.removeEventListener('focus', handleFocus);
     };
   }, [editorRef.current]);
 

@@ -19,13 +19,32 @@ async function registerFormats() {
     logger.info('Starting format registration...');
     const { default: Quill } = await import('quill');
 
-    // Import all blots
-    const imports = await Promise.all([
+    // Import blots dynamically based on initial requirements
+    const basicBlots = await Promise.all([
       import('./boldBlot'),
       import('./italicBlot'),
       import('./linkBlot'),
-      import('./blockquoteBlot'),
       import('./headerBlot'),
+    ]);
+
+    // Register basic blots first for faster initial load
+    const [BoldBlot, ItalicBlot, LinkBlot, HeaderBlot] = basicBlots.map(
+      (module) => module.default
+    );
+
+    const basicFormats = {
+      'formats/bold': BoldBlot,
+      'formats/italic': ItalicBlot,
+      'formats/link': LinkBlot,
+      'formats/header': HeaderBlot,
+    };
+
+    // Register basic formats
+    Quill.register(basicFormats);
+
+    // Load and register advanced formats asynchronously
+    const advancedBlots = await Promise.all([
+      import('./blockquoteBlot'),
       import('./dividerBlot'),
       import('./imageBlot'),
       import('./videoBlot'),
@@ -34,25 +53,16 @@ async function registerFormats() {
     ]);
 
     const [
-      BoldBlot,
-      ItalicBlot,
-      LinkBlot,
       BlockquoteBlot,
-      HeaderBlot,
       DividerBlot,
       ImageBlot,
       VideoBlot,
       AudioBlot,
       EmbedBlot,
-    ] = imports.map((module) => module.default);
+    ] = advancedBlots.map((module) => module.default);
 
-    // Verify each blot before registration
-    const blots = {
-      'formats/bold': BoldBlot,
-      'formats/italic': ItalicBlot,
-      'formats/link': LinkBlot,
+    const advancedFormats = {
       'formats/blockquote': BlockquoteBlot,
-      'formats/header': HeaderBlot,
       'formats/divider': DividerBlot,
       'formats/image': ImageBlot,
       'formats/video': VideoBlot,
@@ -61,18 +71,20 @@ async function registerFormats() {
     };
 
     // Verify each blot has required static properties
-    Object.entries(blots).forEach(([name, blot]) => {
-      if (!blot.blotName || !blot.tagName) {
-        throw new Error(`Invalid blot configuration for ${name}`);
+    Object.entries({ ...basicFormats, ...advancedFormats }).forEach(
+      ([name, blot]) => {
+        if (!blot.blotName || !blot.tagName) {
+          throw new Error(`Invalid blot configuration for ${name}`);
+        }
       }
-    });
+    );
 
-    // Register all blots
-    Quill.register(blots);
+    // Register advanced formats
+    Quill.register(advancedFormats);
     formatsRegistered = true;
 
-    // Verify registration by checking if blots can be imported
-    const verifyFormats = Object.keys(blots)
+    // Verify registration
+    const verifyFormats = Object.keys({ ...basicFormats, ...advancedFormats })
       .map((format) => {
         try {
           const blot = Quill.import(format);
@@ -87,7 +99,7 @@ async function registerFormats() {
   } catch (error) {
     logger.error('Failed to register format:', error);
     formatsRegistered = false;
-    throw error; // Re-throw to handle in component
+    throw error;
   }
 }
 

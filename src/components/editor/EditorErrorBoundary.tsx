@@ -1,10 +1,10 @@
 'use client';
 
-import { Component, type ReactNode } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 
 interface Props {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
 interface State {
@@ -12,7 +12,7 @@ interface State {
   error: Error | null;
 }
 
-export class EditorErrorBoundary extends Component<Props, State> {
+export class EditorErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -22,26 +22,27 @@ export class EditorErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error): void {
-    console.error('Editor error:', error);
+  componentDidCatch(error: Error) {
+    console.error('Editor Error:', error);
+    // Send to error tracking
+    if (window?.Sentry) {
+      window.Sentry.captureException(error);
+    }
   }
 
-  render(): ReactNode {
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
     if (this.state.hasError) {
       return (
-        <div className="flex min-h-[500px] flex-col items-center justify-center space-y-4 rounded-lg border bg-card p-8">
-          <h2 className="text-xl font-semibold">Editor Error</h2>
-          <p className="text-muted-foreground">
-            {this.state.error?.message || 'An error occurred in the editor.'}
+        <div className="flex min-h-[500px] flex-col items-center justify-center space-y-4 rounded-lg border bg-muted p-8 text-center">
+          <h3 className="text-lg font-semibold">Editor failed to load</h3>
+          <p className="text-sm text-muted-foreground">
+            {this.state.error?.message || 'An unexpected error occurred'}
           </p>
-          <Button
-            onClick={() => {
-              this.setState({ hasError: false, error: null });
-              window.location.reload();
-            }}
-          >
-            Try Again
-          </Button>
+          <Button onClick={this.handleRetry}>Try Again</Button>
         </div>
       );
     }
