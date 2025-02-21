@@ -79,3 +79,9 @@ node_modules/
 /memory-bank/
 memory-bank/
 *.memory-bank
+
+# Cursor IDE files
+.cursor/
+
+# Backup scripts
+scripts/backup-critical.sh
