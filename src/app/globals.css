@@ -160,3 +160,33 @@ html {
     margin: 1rem auto !important;
   }
 }
+
+/* Editor Styles */
+.editor-wrapper {
+  position: relative;
+  width: 100%;
+  min-height: 500px;
+  z-index: 1;
+}
+
+.editor-wrapper .ql-editor {
+  min-height: 500px;
+  padding: 1rem;
+  cursor: text;
+  z-index: 1;
+}
+
+.editor-wrapper .ql-editor:focus {
+  outline: none;
+}
+
+/* Ensure editor content is above other elements */
+.ql-container {
+  position: relative;
+  z-index: 1;
+}
+
+/* Remove any pointer-events interference */
+.ql-editor * {
+  pointer-events: auto;
+}

@@ -9,18 +9,32 @@ import { trpc } from '@/lib/trpc';
 import { ArrowLeftIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, lazy } from 'react';
 import { type TRPCClientErrorLike } from '@trpc/client';
 import { type AppRouter } from '@/server/api/root';
 import { CategoryList } from '@/components/category/CategoryList';
 import { TagList } from '@/components/tag/TagList';
 
-const QuillEditor = dynamic(() => import('@/components/editor/QuillEditor'), {
-  ssr: false,
-  loading: () => (
-    <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
-  ),
-});
+// Lazy load editor components
+const QuillEditor = dynamic(
+  () =>
+    import('@/components/editor/QuillEditor').then((mod) => ({
+      default: mod.default,
+      __esModule: true,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
+    ),
+  }
+);
+
+// Lazy load category and tag components
+const CategoryListComponent = lazy(
+  () => import('@/components/category/CategoryList')
+);
+const TagListComponent = lazy(() => import('@/components/tag/TagList'));
 
 export default function EditPost({ params }: { params: { id: string } }) {
   const id = params.id;
@@ -164,7 +178,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
 
   return (
     <MainLayout>
-      <div className="mx-auto max-w-7xl px-4 py-8 md:px-8">
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         <div className="mb-8 flex items-center justify-between">
           <Link href={`/blog/${id}`} className="nav-button">
             <ArrowLeftIcon className="icon-sm mr-2" />
@@ -184,30 +198,28 @@ export default function EditPost({ params }: { params: { id: string } }) {
           </div>
         </div>
 
-        <div className="space-y-8">
+        <div className="mt-8 space-y-6">
           <Input
             type="text"
-            placeholder="Enter your blog title..."
-            className="border-none bg-transparent text-4xl font-bold placeholder:text-muted-foreground/50 focus-visible:ring-0"
+            placeholder="Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            className="text-2xl font-bold"
           />
 
-          <div className="min-h-[500px] rounded-lg border bg-card">
-            <Suspense
-              fallback={
-                <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
-              }
-            >
-              <QuillEditor
-                value={content}
-                onChange={setContent}
-                placeholder="Write your blog post..."
-              />
-            </Suspense>
-          </div>
+          <Suspense
+            fallback={
+              <div className="min-h-[500px] animate-pulse rounded-lg border bg-muted" />
+            }
+          >
+            <QuillEditor
+              value={content}
+              onChange={(value) => setContent(value)}
+              placeholder="Write your blog post..."
+            />
+          </Suspense>
 
-          <div className="space-y-6">
+          <div className="space-y-4">
             <CategoryList
               selectedIds={selectedCategoryIds}
               onSelect={(id: string) =>
@@ -219,6 +231,7 @@ export default function EditPost({ params }: { params: { id: string } }) {
                 )
               }
             />
+
             <TagList
               selectedIds={selectedTagIds}
               onSelect={(id: string) =>
@@ -228,6 +241,15 @@ export default function EditPost({ params }: { params: { id: string } }) {
                 setSelectedTagIds(selectedTagIds.filter((tid) => tid !== id))
               }
             />
+          </div>
+
+          <div className="flex justify-end space-x-4">
+            <Button variant="outline" onClick={handleSave}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={updateDraft.isPending}>
+              {updateDraft.isPending ? 'Saving...' : 'Save'}
+            </Button>
           </div>
         </div>
       </div>
